@@ -2,6 +2,7 @@ import pybullet as p
 import pybullet_data
 import time
 import numpy as np
+import transforms3d as t3d
 
 
 class Bullet:
@@ -10,18 +11,18 @@ class Bullet:
         p.setAdditionalSearchPath(pybullet_data.getDataPath())
         p.setGravity(0, 0, -9.81)
         self.plane = p.loadURDF("plane.urdf")
-        self.robot = self.load_robot()
-        self.cube = self.load_cube()
-        self.camera_link = self.get_gripper_link()
+        self.robot = self._load_robot()
+        self.cube = self._load_cube()
+        self.camera_link = self._get_gripper_link()
 
-    def load_robot(self):
+    def _load_robot(self):
         robot_urdf = "kuka_iiwa/model.urdf"
         start_pos = [0, 0, 0]
         start_orientation = p.getQuaternionFromEuler([0, 0, 0])
         robot = p.loadURDF(robot_urdf, start_pos, start_orientation, useFixedBase=True)
         return robot
 
-    def load_cube(self):
+    def _load_cube(self):
         cube_start_pos = [0.6, 0, 0.05]
         cube_start_orientation = p.getQuaternionFromEuler([0, 0, 0])
         visual_shape_id = p.createVisualShape(
@@ -41,25 +42,21 @@ class Bullet:
         )
         return cube
 
-    def get_gripper_link(self):
+    def _get_gripper_link(self):
         return 6
 
-    def step(self):
+    def step(self, action):
+        self.servo(action)
         p.stepSimulation()
         time.sleep(1.0 / 240.0)
+        return self._get_observation()
 
-    def get_joint_info(self):
-        num_joints = p.getNumJoints(self.robot)
-        joint_infos = []
-        for i in range(num_joints):
-            info = p.getJointInfo(self.robot, i)
-            joint_infos.append(info)
-        return joint_infos
+    def servo(self, pose):
+        target_pos = pose[:3, 3]
+        target_rot = pose[:3, :3]
+        q = t3d.quaternions.mat2quat(target_rot)
+        target_orn = [q[1], q[2], q[3], q[0]]
 
-    def move_ee_to(self, target_pos, target_orn=None):
-        if target_orn is None:
-            # Default: keep orientation pointing down
-            target_orn = p.getQuaternionFromEuler([0, np.pi, -np.pi / 2])
         joint_poses = p.calculateInverseKinematics(
             self.robot, self.camera_link, target_pos, target_orn
         )
@@ -72,7 +69,7 @@ class Bullet:
                 force=500,
             )
 
-    def render_camera(self):
+    def _get_observation(self):
         # Camera mounted on gripper
         link_state = p.getLinkState(self.robot, self.camera_link)
         cam_pos = link_state[0]
@@ -88,7 +85,9 @@ class Bullet:
         view_matrix = p.computeViewMatrix(cam_pos, target, up)
         proj_matrix = p.computeProjectionMatrixFOV(60, 1, 0.01, 2)
         _, _, px, _, _ = p.getCameraImage(640, 480, view_matrix, proj_matrix)
-        return px
+        return {
+            'camera.rgb': px,
+        }
 
     def close(self):
         p.disconnect()
@@ -96,9 +95,7 @@ class Bullet:
 
 if __name__ == "__main__":
     sim = Bullet()
-    # Move end effector in a small circle above the cube
     for t in range(100000000):
-        sim.move_ee_to([0.5, 0, 0.3])
-        sim.step()
-        sim.render_camera()
+        pose = np.array([[0, 1, 0, 0.5], [1, 0, 0, 0], [0, 0, -1, 0.3], [0, 0, 0, 1]])
+        observation = sim.step(pose)
     sim.close()
