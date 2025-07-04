@@ -12,7 +12,7 @@ class Bullet:
         p.setGravity(0, 0, -9.81)
         self.plane = p.loadURDF("plane.urdf")
         self.robot = self._load_robot()
-        self.cube = self._load_cube()
+        self.cube = self._load_object()
         self.camera_link = self._get_gripper_link()
 
     def _load_robot(self):
@@ -22,36 +22,39 @@ class Bullet:
         robot = p.loadURDF(robot_urdf, start_pos, start_orientation, useFixedBase=True)
         return robot
 
-    def _load_cube(self):
-        cube_start_pos = [0.6, 0, 0.05]
-        cube_start_orientation = p.getQuaternionFromEuler([0, 0, 0])
+    def _load_object(self):
+        mesh_path = "duck_vhacd.obj"
+        mesh_start_pos = [0.6, 0, 0.05]
+        mesh_start_orientation = p.getQuaternionFromEuler([0, 0, 0])
         visual_shape_id = p.createVisualShape(
-            shapeType=p.GEOM_BOX,
-            halfExtents=[0.025, 0.025, 0.025],
-            rgbaColor=[1, 0, 0, 1],
+            shapeType=p.GEOM_MESH,
+            fileName=mesh_path,
+            meshScale=[0.1, 0.1, 0.1],
+            rgbaColor=[1, 1, 0, 1],
         )
         collision_shape_id = p.createCollisionShape(
-            shapeType=p.GEOM_BOX, halfExtents=[0.025, 0.025, 0.025]
+            shapeType=p.GEOM_MESH,
+            fileName=mesh_path,
+            meshScale=[0.1, 0.1, 0.1],
         )
-        cube = p.createMultiBody(
-            baseMass=1,
+        mesh = p.createMultiBody(
+            baseMass=0,
             baseCollisionShapeIndex=collision_shape_id,
             baseVisualShapeIndex=visual_shape_id,
-            basePosition=cube_start_pos,
-            baseOrientation=cube_start_orientation,
+            basePosition=mesh_start_pos,
+            baseOrientation=mesh_start_orientation,
         )
-        return cube
+        return mesh
 
     def _get_gripper_link(self):
         return 6
 
-    def step(self, action):
-        self.servo(action)
+    def send_action(self, action):
+        self._servo(action)
         p.stepSimulation()
         time.sleep(1.0 / 240.0)
-        return self._get_observation()
 
-    def servo(self, pose):
+    def _servo(self, pose):
         target_pos = pose[:3, 3]
         target_rot = pose[:3, :3]
         q = t3d.quaternions.mat2quat(target_rot)
@@ -69,7 +72,7 @@ class Bullet:
                 force=500,
             )
 
-    def _get_observation(self):
+    def get_observation(self):
         # Camera mounted on gripper
         link_state = p.getLinkState(self.robot, self.camera_link)
         cam_pos = link_state[0]
@@ -86,7 +89,7 @@ class Bullet:
         proj_matrix = p.computeProjectionMatrixFOV(60, 1, 0.01, 2)
         _, _, px, _, _ = p.getCameraImage(640, 480, view_matrix, proj_matrix)
         return {
-            'camera.rgb': px,
+            "camera.rgb": px,
         }
 
     def close(self):
@@ -97,5 +100,6 @@ if __name__ == "__main__":
     sim = Bullet()
     for t in range(100000000):
         pose = np.array([[0, 1, 0, 0.5], [1, 0, 0, 0], [0, 0, -1, 0.3], [0, 0, 0, 1]])
-        observation = sim.step(pose)
+        sim.send_action(pose)
+        observation = sim.get_observation()
     sim.close()
