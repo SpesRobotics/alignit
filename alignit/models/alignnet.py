@@ -1,10 +1,7 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from torchvision.models import efficientnet_b0, resnet18
-from torchvision.models._api import WeightsEnum
 from torchvision.models import EfficientNet_B0_Weights, ResNet18_Weights
-import time
 
 
 class AlignNet(nn.Module):
@@ -111,11 +108,14 @@ class AlignNet(nn.Module):
 
 
 if __name__ == "__main__":
-    batch_size = 1
-    model = AlignNet(backbone_name="efficientnet_b0", use_vector_input=True)
+    import time
 
-    rgb_images = torch.randn(batch_size, 4, 3, 224, 224)
-    vector_inputs = [torch.randn(10) for _ in range(batch_size)]
+    batch_size = 1
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = AlignNet(backbone_name="efficientnet_b0", use_vector_input=True).to(device)
+
+    rgb_images = torch.randn(batch_size, 4, 3, 224, 224).to(device)
+    vector_inputs = [torch.randn(10).to(device) for _ in range(batch_size)]
 
     output = None
     start_time = time.time()
@@ -124,5 +124,6 @@ if __name__ == "__main__":
     end_time = time.time()
     duration_ms = ((end_time - start_time) / 100) * 1000
     print(f"Inference time: {duration_ms:.3f} ms")
+    print(f"Optimal for {1000 / duration_ms:.2f} fps")
+    print("Output shape:", output.shape)
 
-    print(output.shape)
