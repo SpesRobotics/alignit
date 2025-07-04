@@ -1,3 +1,9 @@
+Record:
+```bash
+python3 -m alignit.record
+```
+
+
 ## Development
 
 ```bash
