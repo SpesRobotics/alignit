@@ -72,6 +72,16 @@ class Bullet:
                 force=500,
             )
 
+    def pose(self):
+        link_state = p.getLinkState(self.robot, self.camera_link)
+        pos = link_state[4]
+        q = link_state[5]
+        return t3d.affines.compose(
+            pos,
+            t3d.quaternions.quat2mat([q[3], q[0], q[1], q[2]]),
+            [1, 1, 1],
+        )
+
     def get_observation(self):
         # Camera mounted on gripper
         link_state = p.getLinkState(self.robot, self.camera_link)
@@ -88,6 +98,7 @@ class Bullet:
         view_matrix = p.computeViewMatrix(cam_pos, target, up)
         proj_matrix = p.computeProjectionMatrixFOV(60, 1, 0.01, 2)
         _, _, px, _, _ = p.getCameraImage(640, 480, view_matrix, proj_matrix)
+
         return {
             "camera.rgb": px,
         }
