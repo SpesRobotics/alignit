@@ -64,6 +64,11 @@ def main():
             loss.backward()
             optimizer.step()
             tqdm.write(f"Loss: {loss.item():.4f}")
+
+    # Save the trained model
+    torch.save(net.state_dict(), "alignnet_model.pth")
+    tqdm.write("Model saved as alignnet_model.pth")
+
     print("Training complete.")
 
 
