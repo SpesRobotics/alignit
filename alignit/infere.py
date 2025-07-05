@@ -19,8 +19,6 @@ def main():
 
     # Convert images to tensor and reshape from HWC to CHW format
     images_tensor = torch.tensor(images, dtype=torch.float32).permute(0, 3, 1, 2).unsqueeze(0)
-    # Keep only RGB channels (first 3) if image has alpha channel
-    images_tensor = images_tensor[:, :, :3, :, :]
     with torch.no_grad():
         action = net(images_tensor)
     action = action.squeeze(0).numpy()

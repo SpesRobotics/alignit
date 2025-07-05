@@ -99,6 +99,12 @@ class Bullet:
         proj_matrix = p.computeProjectionMatrixFOV(60, 1, 0.01, 2)
         _, _, px, _, _ = p.getCameraImage(640, 480, view_matrix, proj_matrix)
 
+        # make sure px 3 channels, rgb, not rgba
+        if len(px.shape) == 2:
+            px = np.stack([px, px, px], axis=-1)
+        elif px.shape[2] == 4:
+            px = px[:, :, :3]
+
         return {
             "camera.rgb": px,
         }
