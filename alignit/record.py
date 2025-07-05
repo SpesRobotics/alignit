@@ -3,6 +3,8 @@ import numpy as np
 import transforms3d as t3d
 from alignit.robots.bullet import Bullet
 from alignit.utils.tfs import are_tfs_close
+from datasets import Dataset, Features, Sequence, Value, Image, load_from_disk
+from alignit.utils.zhou import se3_sixd
 
 
 def generate_spiral_trajectory(
@@ -58,6 +60,11 @@ def servo_to_pose(robot, pose, lin_tol=1e-1, ang_tol=1e-1):
 
 def main():
     robot = Bullet()
+    features = Features({
+        "images": Sequence(Image()),
+        "action": Sequence(Value("float32"))
+    })
+
     pose_final_target = t3d.affines.compose(
         [0.5, 0.1, 0.18], t3d.euler.euler2mat(np.pi, 0, 0), [1, 1, 1]
     )
@@ -72,9 +79,25 @@ def main():
         pose_alignment_target, z_step=0.002, radius_step=0.002, num_steps=50
     )
 
+    frames = []
     for pose in trajectory:
         servo_to_pose(robot, pose, lin_tol=0.01, ang_tol=0.01)
         time.sleep(0.05)
+        
+
+        current_pose = robot.pose()
+        action_pose = np.linalg.inv(pose_alignment_target) @ current_pose
+        action_sixd = se3_sixd(action_pose)
+
+        observation = robot.get_observation()
+        frame = {
+            "images": [ observation["camera.rgb"]],
+            "action": action_sixd
+        }
+        frames.append(frame)
+    
+    dataset = Dataset.from_list(frames, features=features)
+    dataset.save_to_disk("data/duck")
 
     robot.close()
 
