@@ -3,9 +3,9 @@ from setuptools import setup, find_packages
 setup(
     name="alignit",
     version="0.0.1",
-    description="Real-time robot arm alignment using computer vision",
-    author="Darko Lukic",
-    author_email="darko.lukic@spes.ai",
+    description="Model-free real-time robot arm alignment using one or more RGB(D) cameras.",
+    author="Spes Robotics",
+    author_email="contact@spes.ai",
     packages=find_packages(),
     install_requires=[
         "torch",
@@ -14,6 +14,8 @@ setup(
         "datasets",
         "gradio",
         "transforms3d",
+        "pybullet",
+        "tqdm",
     ],
     python_requires=">=3.7",
     classifiers=[
