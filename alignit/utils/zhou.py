@@ -11,6 +11,9 @@ def se3_sixd(m):
 
 
 def sixd_se3(vec):
+    if isinstance(vec, list):
+        vec = np.array(vec, dtype=np.float32)
+
     assert vec.shape[-1] == 9, "Input vector must have length 9"
     trans = vec[:3]
     rot6 = vec[3:9]

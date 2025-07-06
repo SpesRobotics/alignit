@@ -33,7 +33,7 @@ def main():
     optimizer = Adam(net.parameters(), lr=1e-4)
     criterion = MSELoss()
     net.train()
-    for epoch in range(10):  # number of epochs
+    for epoch in range(1):  # number of epochs
         for batch in tqdm(train_loader, desc=f"Epoch {epoch+1}"):
             images = batch["images"]
             actions = batch["action"]

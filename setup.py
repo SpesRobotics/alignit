@@ -10,6 +10,10 @@ setup(
     install_requires=[
         "torch",
         "torchvision",
+        "numpy",
+        "datasets",
+        "gradio",
+        "transforms3d",
     ],
     python_requires=">=3.7",
     classifiers=[
