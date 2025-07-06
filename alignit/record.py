@@ -3,8 +3,10 @@ import numpy as np
 import transforms3d as t3d
 from alignit.robots.bullet import Bullet
 from alignit.utils.tfs import are_tfs_close
-from datasets import Dataset, Features, Sequence, Value, Image, load_from_disk
+from datasets import Dataset, Features, Sequence, Value, Image, load_from_disk, concatenate_datasets
 from alignit.utils.zhou import se3_sixd
+import shutil
+import os
 
 
 def generate_spiral_trajectory(
@@ -53,11 +55,6 @@ def generate_spiral_trajectory(
     return trajectory
 
 
-def servo_to_pose(robot, pose, lin_tol=1e-1, ang_tol=1e-1):
-    while not are_tfs_close(robot.pose(), pose, lin_tol, ang_tol):
-        robot.send_action(pose)
-
-
 def main():
     robot = Bullet()
     features = Features({
@@ -71,33 +68,57 @@ def main():
     pose_alignment_target = pose_final_target @ t3d.affines.compose(
         [0, 0, -0.15], t3d.euler.euler2mat(0, 0, 0), [1, 1, 1]
     )
-
-    servo_to_pose(robot, pose_final_target)
-    servo_to_pose(robot, pose_alignment_target)
-
-    trajectory = generate_spiral_trajectory(
-        pose_alignment_target, z_step=0.002, radius_step=0.002, num_steps=50
+    pose_record_start = pose_alignment_target @ t3d.affines.compose(
+        [0, 0, 0.05], t3d.euler.euler2mat(0, 0, 0), [1, 1, 1]
     )
 
-    frames = []
-    for pose in trajectory:
-        servo_to_pose(robot, pose, lin_tol=0.01, ang_tol=0.01)
-        time.sleep(0.05)
+    robot.servo_to_pose(pose_final_target)
+
+    for i in range(10):
+        pose_record_start_episode = pose_record_start.copy()
+        pose_record_start_episode[:3, 3] += np.random.uniform(
+            low=[-0.03, -0.03, -0.1],
+            high=[0.03, 0.03, 0.01]
+        )
+        robot.servo_to_pose(pose_record_start_episode)
+
+        trajectory = generate_spiral_trajectory(
+            pose_record_start_episode, z_step=0.001, radius_step=0.001, num_steps=70
+        )
+
+        frames = []
+        for pose in trajectory:
+            robot.servo_to_pose(pose, lin_tol=0.01, ang_tol=0.01)
+            current_pose = robot.pose()
+            action_pose = np.linalg.inv(pose_alignment_target) @ current_pose
+            action_sixd = se3_sixd(action_pose)
+
+            observation = robot.get_observation()
+            frame = {
+                "images": [ observation["camera.rgb"]],
+                "action": action_sixd
+            }
+            frames.append(frame)
         
+        print(f"Episode {i+1} completed with {len(frames)} frames.")
+        episode_dataset = Dataset.from_list(frames, features=features)
+        
+        if i == 0:
+            # First episode, save directly
+            combined_dataset = episode_dataset
+        else:
+            previous_dataset = load_from_disk("data/duck")
+            previous_dataset = previous_dataset.cast(features)
+            combined_dataset = concatenate_datasets([previous_dataset, episode_dataset])
+            del previous_dataset
 
-        current_pose = robot.pose()
-        action_pose = np.linalg.inv(pose_alignment_target) @ current_pose
-        action_sixd = se3_sixd(action_pose)
-
-        observation = robot.get_observation()
-        frame = {
-            "images": [ observation["camera.rgb"]],
-            "action": action_sixd
-        }
-        frames.append(frame)
-    
-    dataset = Dataset.from_list(frames, features=features)
-    dataset.save_to_disk("data/duck")
+        temp_path = "data/duck_temp"
+        combined_dataset.save_to_disk(temp_path)
+        
+        # Remove old dataset and move temp to final location
+        if os.path.exists("data/duck"):
+            shutil.rmtree("data/duck")
+        shutil.move(temp_path, "data/duck")
 
     robot.close()
 

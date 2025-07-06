@@ -1,4 +1,5 @@
 import numpy as np
+import transforms3d as t3d
 
 
 def are_tfs_close(a, b=None, lin_tol=1e-2, ang_tol=1e-2):
@@ -24,3 +25,9 @@ def are_tfs_close(a, b=None, lin_tol=1e-2, ang_tol=1e-2):
     roll = np.arctan2(d[2, 1], d[2, 2])
     rpy = np.array([roll, pitch, yaw])
     return np.allclose(rpy, np.zeros(3), atol=ang_tol)
+
+
+def print_pose(pose):
+    action_xyz = pose[:3, 3]
+    action_rot = t3d.euler.mat2euler(pose[:3, :3], axes="sxyz")
+    print(f"Pose (xyzrpy): {action_xyz}, {action_rot}")

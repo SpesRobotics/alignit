@@ -3,9 +3,10 @@ import pybullet_data
 import time
 import numpy as np
 import transforms3d as t3d
+from alignit.robots.robot import Robot
 
 
-class Bullet:
+class Bullet(Robot):
     def __init__(self):
         self.physicsClient = p.connect(p.GUI)
         p.setAdditionalSearchPath(pybullet_data.getDataPath())
