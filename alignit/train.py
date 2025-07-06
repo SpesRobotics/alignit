@@ -28,12 +28,12 @@ def main():
 
     # implement a training loop here
     train_loader = DataLoader(
-        train_dataset["train"], batch_size=32, shuffle=True, collate_fn=collate_fn
+        train_dataset["train"], batch_size=8, shuffle=True, collate_fn=collate_fn
     )
     optimizer = Adam(net.parameters(), lr=1e-4)
     criterion = MSELoss()
     net.train()
-    for epoch in range(1):  # number of epochs
+    for epoch in range(100):
         for batch in tqdm(train_loader, desc=f"Epoch {epoch+1}"):
             images = batch["images"]
             actions = batch["action"]
@@ -43,7 +43,6 @@ def main():
             batch_images = []
             transform = transforms.Compose(
                 [
-                    transforms.Resize((224, 224)),  # Resize if needed
                     transforms.ToTensor(),
                 ]
             )
@@ -65,9 +64,9 @@ def main():
             optimizer.step()
             tqdm.write(f"Loss: {loss.item():.4f}")
 
-    # Save the trained model
-    torch.save(net.state_dict(), "alignnet_model.pth")
-    tqdm.write("Model saved as alignnet_model.pth")
+        # Save the trained model
+        torch.save(net.state_dict(), "alignnet_model.pth")
+        tqdm.write("Model saved as alignnet_model.pth")
 
     print("Training complete.")
 

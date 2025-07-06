@@ -90,7 +90,8 @@ def main():
         for pose in trajectory:
             robot.servo_to_pose(pose, lin_tol=0.01, ang_tol=0.01)
             current_pose = robot.pose()
-            action_pose = np.linalg.inv(pose_alignment_target) @ current_pose
+
+            action_pose = np.linalg.inv(current_pose) @ pose_alignment_target
             action_sixd = se3_sixd(action_pose)
 
             observation = robot.get_observation()

@@ -98,7 +98,7 @@ class Bullet(Robot):
         ]
         view_matrix = p.computeViewMatrix(cam_pos, target, up)
         proj_matrix = p.computeProjectionMatrixFOV(60, 1, 0.01, 2)
-        _, _, px, _, _ = p.getCameraImage(640, 480, view_matrix, proj_matrix)
+        _, _, px, _, _ = p.getCameraImage(320, 240, view_matrix, proj_matrix)
 
         # make sure px 3 channels, rgb, not rgba
         if len(px.shape) == 2:

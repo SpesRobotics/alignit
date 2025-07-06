@@ -19,7 +19,7 @@ def main():
     robot = Bullet()
 
     start_pose = t3d.affines.compose(
-        [0.5, 0.1, 0.3], t3d.euler.euler2mat(np.pi, 0, 0), [1, 1, 1]
+        [0.5, 0.1, 0.2], t3d.euler.euler2mat(np.pi, 0, 0), [1, 1, 1]
     )
     robot.servo_to_pose(start_pose)
 

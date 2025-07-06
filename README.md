@@ -6,8 +6,8 @@ python3 -m alignit.record
 # Use the dataset to train a model
 python3 -m alignit.train
 
-# Visualize a sample if needed
-python3 -m alignit.visualize --index=0
+# Visualize dataset
+python3 -m alignit.visualize
 
 # Run inference
 python3 -m alignit.infere
