@@ -6,7 +6,7 @@ from tqdm import tqdm
 from datasets import load_from_disk
 from alignit.models.alignnet import AlignNet
 from torchvision import transforms
-from PIL import Image
+import numpy as np
 
 
 def collate_fn(batch):
@@ -16,12 +16,13 @@ def collate_fn(batch):
 
 
 def main():
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # Load the dataset from disk
     dataset = load_from_disk("data/duck")
     net = AlignNet(
         output_dim=9,  # 3 for translation + 6 for rotation in sixd format
         use_vector_input=False,  # Disable vector input since we're not using it
-    )
+    ).to(device)
 
     # train
     train_dataset = dataset.train_test_split(test_size=0.2, seed=42)
@@ -36,7 +37,7 @@ def main():
     for epoch in range(100):
         for batch in tqdm(train_loader, desc=f"Epoch {epoch+1}"):
             images = batch["images"]
-            actions = batch["action"]
+            actions = batch["action"].to(device)
 
             # Convert PIL Images to tensors and stack them properly
             # images is a list of lists of PIL Images
@@ -55,7 +56,7 @@ def main():
                 batch_images.append(stacked_tensors)
 
             # Stack all batches to get shape (B, N, 3, H, W)
-            batch_images = torch.stack(batch_images, dim=0)
+            batch_images = torch.stack(batch_images, dim=0).to(device)
 
             optimizer.zero_grad()
             outputs = net(batch_images)

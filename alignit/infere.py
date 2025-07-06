@@ -8,12 +8,14 @@ import numpy as np
 
 
 def main():
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # load model from file
     net = AlignNet(
         output_dim=9,
         use_vector_input=False,
     )
-    net.load_state_dict(torch.load("alignnet_model.pth"))
+    net.load_state_dict(torch.load("alignnet_model.pth", map_location=device))
+    net.to(device)
     net.eval()
 
     robot = Bullet()
@@ -25,18 +27,21 @@ def main():
 
     while True:
         observation = robot.get_observation()
-        images = [ observation["camera.rgb"] ]
+        images = [ observation["camera.rgb"].astype(np.float32) / 255.0 ]
 
         # Convert images to tensor and reshape from HWC to CHW format
-        images_tensor = torch.tensor(images, dtype=torch.float32).permute(0, 3, 1, 2).unsqueeze(0)
+        images_tensor = torch.tensor(images, dtype=torch.float32).permute(0, 3, 1, 2).unsqueeze(0).to(device)
+        print(torch.max(images_tensor))
+        
         with torch.no_grad():
             relative_action = net(images_tensor)
-        relative_action = relative_action.squeeze(0).numpy()
+        relative_action = relative_action.squeeze(0).cpu().numpy()
         relative_action = sixd_se3(relative_action)
         print_pose(relative_action)
 
         action = robot.pose() @ relative_action
         robot.send_action(action)
+
 
 if __name__ == "__main__":
     main()
