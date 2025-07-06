@@ -1,3 +1,7 @@
+# AlignIt
+
+Model-free real-time robot arm alignment using one or more RGB(D) cameras.
+
 ## Getting Started
 ```bash
 # Record a dataset
