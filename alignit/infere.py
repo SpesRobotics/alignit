@@ -25,22 +25,25 @@ def main():
     )
     robot.servo_to_pose(start_pose)
 
-    while True:
-        observation = robot.get_observation()
-        images = [ observation["camera.rgb"].astype(np.float32) / 255.0 ]
+    try:
+        while True:
+            observation = robot.get_observation()
+            images = [ observation["camera.rgb"].astype(np.float32) / 255.0 ]
 
-        # Convert images to tensor and reshape from HWC to CHW format
-        images_tensor = torch.tensor(images, dtype=torch.float32).permute(0, 3, 1, 2).unsqueeze(0).to(device)
-        print(torch.max(images_tensor))
-        
-        with torch.no_grad():
-            relative_action = net(images_tensor)
-        relative_action = relative_action.squeeze(0).cpu().numpy()
-        relative_action = sixd_se3(relative_action)
-        print_pose(relative_action)
+            # Convert images to tensor and reshape from HWC to CHW format
+            images_tensor = torch.tensor(images, dtype=torch.float32).permute(0, 3, 1, 2).unsqueeze(0).to(device)
+            print(torch.max(images_tensor))
+            
+            with torch.no_grad():
+                relative_action = net(images_tensor)
+            relative_action = relative_action.squeeze(0).cpu().numpy()
+            relative_action = sixd_se3(relative_action)
+            print_pose(relative_action)
 
-        action = robot.pose() @ relative_action
-        robot.send_action(action)
+            action = robot.pose() @ relative_action
+            robot.send_action(action)
+    except KeyboardInterrupt:
+        print("\nExiting...")
 
 
 if __name__ == "__main__":
