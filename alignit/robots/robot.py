@@ -1,5 +1,5 @@
 from alignit.utils.tfs import are_tfs_close
-
+import numpy as np
 
 class Robot:
     def send_action(self, action):
@@ -8,7 +8,7 @@ class Robot:
     def pose(self):
         raise NotImplementedError("This method should be overridden by subclasses.")
 
-    def get_observation(self) -> dict:
+    def get_observation(self) -> np.ndarray:
         raise NotImplementedError("This method should be overridden by subclasses.")
         
     def servo_to_pose(self, pose, lin_tol=1e-1, ang_tol=1e-1):

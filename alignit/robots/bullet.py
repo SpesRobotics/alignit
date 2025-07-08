@@ -98,16 +98,27 @@ class Bullet(Robot):
         ]
         view_matrix = p.computeViewMatrix(cam_pos, target, up)
         proj_matrix = p.computeProjectionMatrixFOV(60, 1, 0.01, 2)
-        _, _, px, _, _ = p.getCameraImage(320, 240, view_matrix, proj_matrix)
-
-        # make sure px 3 channels, rgb, not rgba
-        if len(px.shape) == 2:
-            px = np.stack([px, px, px], axis=-1)
-        elif px.shape[2] == 4:
-            px = px[:, :, :3]
-
+        width, height, rgb_data, depth, segmentation = p.getCameraImage(320, 240, view_matrix, proj_matrix)
+        
+        
+        # Convert RGB data to proper numpy array
+        if isinstance(rgb_data, tuple):
+            # If we got a tuple of pixel values
+            rgb_array = np.array(rgb_data, dtype=np.uint8)
+            # Reshape to (height, width, channels)
+            rgb_array = rgb_array.reshape((height, width, -1))
+        else:
+            # If already an array (newer PyBullet versions)
+            rgb_array = rgb_data
+        
+        # Handle channel formats
+        if len(rgb_array.shape) == 2:  # Grayscale
+            rgb_array = np.stack([rgb_array]*3, axis=-1)  # Convert to RGB
+        elif rgb_array.shape[2] == 4:  # RGBA
+            rgb_array = rgb_array[:, :, :3]  # Remove alpha
+        
         return {
-            "camera.rgb": px,
+            "camera.rgb": rgb_array  # Now guaranteed (H,W,3) uint8 array
         }
 
     def close(self):
