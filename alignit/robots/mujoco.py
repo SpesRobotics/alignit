@@ -5,8 +5,9 @@ import time
 
 import os
 from teleop.utils.jacobi_robot import JacobiRobot
+
 URDF_PATH = os.path.join(os.path.dirname(__file__), "robot.urdf")
-XARM_LITE_6_MJCF_PATH = "mujoco_menagerie/ufactory_lite6/lite6.xml"
+XARM_7_MJCF_PATH = "mujoco_menagerie/xarm7/xarm7.xml"
 
 class MuJoCo_xArmLite6:
     def __init__(self, mjcf_model_path=None):
@@ -53,7 +54,7 @@ class MuJoCo_xArmLite6:
             self.viewer.close()
 if __name__ == "__main__":
     # Initialize simulation and IK solver
-    sim = MuJoCo_xArmLite6(mjcf_model_path=XARM_LITE_6_MJCF_PATH)
+    sim = MuJoCo_xArmLite6(mjcf_model_path=XARM_7_MJCF_PATH)
     robot = JacobiRobot(URDF_PATH, ee_link="end_effector")
     
     # Start visualization (optional)
