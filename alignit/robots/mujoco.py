@@ -1,10 +1,13 @@
-import mujoco as mj
+#import mujoco as mj
 import mujoco.viewer
 import numpy as np
 import transforms3d as t3d
 import time
 import pinocchio as pin
 from pathlib import Path
+import os
+os.environ['MUJOCO_GL'] = 'osmesa'  # Add this BEFORE importing mujoco
+import mujoco as mj
 
 # Placeholder for your abstract Robot class if it exists
 # from alignit.robots.robot import Robot
@@ -24,20 +27,15 @@ class MuJoCoRobot: # Inherit from Robot if you have that base class
         self.viewer = mujoco.viewer.launch_passive(self.model, self.data)
         print("DEBUG: MuJoCo passive viewer launched.")
 
-        # Initialize MuJoCo visualization objects for OFFSCREEN rendering (get_observation)
-        # These are separate from the viewer's internal objects and must be managed by you.
-        self.scn = mj.MjvScene(self.model, maxgeom=1000) # Scene object
-        self.cam = mj.MjvCamera()                         # Camera object for offscreen rendering
-        mj.mjv_defaultCamera(self.cam)                    # Set default camera properties
-        self.vopt = mj.MjvOption()                        # Visualization options
-        mj.mjv_defaultOption(self.vopt)                   # Set default visualization options
-        self.pert = mj.MjvPerturb()                       # Perturbation object (for interactive control)
-        mj.mjv_defaultPerturb(self.pert)                  # Set default perturbation options
-        #self.mjr_context = mj.MjrContext(self.model, mj.mjtFontScale.mjFONTSCALE_150)        #mj.mjr_defaultContext(self.mjr_context)          # Set default rendering context properties
-        print("DEBUG: Offscreen rendering objects initialized.")
-        self.mjr_context = mj.MjrContext()                # Rendering context
-        #mj.mjr_defaultContext(self.mjr_context)          # Set default rendering context properties
-
+        # Initialize offscreen rendering objects only when needed (lazy initialization)
+        # This prevents OpenGL context conflicts with the passive viewer
+        self.scn = None
+        self.cam = None
+        self.vopt = None
+        self.pert = None
+        self.mjr_context = None
+        self._offscreen_initialized = False
+        print("DEBUG: Offscreen rendering objects will be initialized on first use.")
 
         # Get joint IDs for control (assuming 6 joints for xArm Lite 6)
         self.joint_names = [f"joint{i}" for i in range(1, 7)] # Adjust if names are different
@@ -62,9 +60,7 @@ class MuJoCoRobot: # Inherit from Robot if you have that base class
         # Initial Pinocchio configuration (important for IK iterations)
         self.current_q_pin = pin.neutral(self.robot_pin.model)
 
-        print("MuJoCo and Pinocchio robot initialized.  xml") # Retained original print
-
-        # Map MuJoCo actuator IDs for control (0-indexed)
+        # Map MuJoCo actuator IDs for control (0-indexed) - MOVED HERE FROM _initialize_offscreen_rendering
         self.mujoco_actuator_ids = []
         for i in range(1, self.robot_pin.model.nq + 1): # Iterate from 1 to nq (for joint1 to jointN from Pinocchio)
             actuator_name = f"joint{i}_ctrl" # Construct the actuator name expected in MJCF
@@ -80,6 +76,33 @@ class MuJoCoRobot: # Inherit from Robot if you have that base class
         self.nq = self.robot_pin.model.nq
         self.nv = self.robot_pin.model.nv
 
+    def _initialize_offscreen_rendering(self):
+        """
+        Initialize offscreen rendering objects when first needed.
+        This prevents OpenGL context conflicts with the passive viewer.
+        """
+        if self._offscreen_initialized:
+            return
+            
+        try:
+            # Initialize MuJoCo visualization objects for OFFSCREEN rendering
+            self.scn = mj.MjvScene(self.model, maxgeom=1000)
+            self.cam = mj.MjvCamera()
+            mj.mjv_defaultCamera(self.cam)
+            self.vopt = mj.MjvOption()
+            mj.mjv_defaultOption(self.vopt)
+            self.pert = mj.MjvPerturb()
+            mj.mjv_defaultPerturb(self.pert)
+            
+            # Initialize the rendering context
+            self.mjr_context = mj.MjrContext(self.model, mj.mjtFontScale.mjFONTSCALE_150)
+            
+            self._offscreen_initialized = True
+            print("DEBUG: Offscreen rendering objects initialized successfully.")
+        except Exception as e:
+            print(f"WARNING: Failed to initialize offscreen rendering: {e}")
+            self._offscreen_initialized = False
+
     def _calculate_ik_pinocchio(self, target_pose_matrix):
         """
         Calculates inverse kinematics using Pinocchio.
@@ -92,7 +115,7 @@ class MuJoCoRobot: # Inherit from Robot if you have that base class
         eps = 1e-6
         IT_MAX = 1000
         DT = 1e-2
-        damp = 1e-6
+        damp = 1e-3
 
         q = self.current_q_pin.copy() # Start IK from the current robot configuration
 
@@ -114,6 +137,14 @@ class MuJoCoRobot: # Inherit from Robot if you have that base class
             # dq is delta_q, which is delta_velocity in tangent space
             dq, residuals, rank, s = np.linalg.lstsq(J, err, rcond=damp)
             q = pin.integrate(self.robot_pin.model, q, dq * DT)
+    
+        for i in range(self.robot_pin.model.nq):
+            if self.model.jnt_limited[i]:
+                q[i] = np.clip(
+                    q[i],
+                    self.model.jnt_range[i, 0],
+                    self.model.jnt_range[i, 1]
+                )
 
         # Update current Pinocchio state for the next IK call
         self.current_q_pin = q
@@ -128,6 +159,15 @@ class MuJoCoRobot: # Inherit from Robot if you have that base class
         # Ensure that the returned target_joint_poses matches the order of self.mujoco_actuator_ids.
         target_joint_poses = self._calculate_ik_pinocchio(action_pose_matrix)
 
+          # Check joint limits
+        for i, q in enumerate(target_joint_poses):
+            joint_name = self.model.joint(i).name
+            limit_low = self.model.jnt_range[i,0] if self.model.jnt_limited[i] else -np.pi
+            limit_high = self.model.jnt_range[i,1] if self.model.jnt_limited[i] else np.pi
+            
+            if not (limit_low <= q <= limit_high):
+                print(f"WARNING: Joint {joint_name} target {q} exceeds limits [{limit_low}, {limit_high}]")
+
         if len(target_joint_poses) != self.model.nu: # Check against number of actuators
             # This check is crucial if IK returns more/less than expected
             # For a 6-DOF fixed-base robot, Pinocchio.nq == MuJoCo.nu == 6
@@ -138,6 +178,7 @@ class MuJoCoRobot: # Inherit from Robot if you have that base class
         
         # Step the MuJoCo simulation
         mj.mj_step(self.model, self.data)
+
 
         # Update the viewer (if it's open)
         if self.viewer.is_running(): # Check if the passive viewer is still active
@@ -159,6 +200,27 @@ class MuJoCoRobot: # Inherit from Robot if you have that base class
         """
         Captures camera images from MuJoCo and returns robot state.
         """
+        # Initialize offscreen rendering if not already done
+        if self.viewer.is_running():
+            return {
+            "qpos": self.data.qpos.copy(),
+            "qvel": self.data.qvel.copy(),
+            "eef_pose": self.pose(),
+        }
+    
+
+        self._initialize_offscreen_rendering()
+        
+        # If offscreen rendering failed to initialize, return observation without camera
+        if not self._offscreen_initialized:
+            print("WARNING: Offscreen rendering not available, returning observation without camera image.")
+            observation = {
+                "qpos": self.data.qpos.copy(),
+                "qvel": self.data.qvel.copy(),
+                "eef_pose": self.pose(), # Current end-effector pose
+            }
+            return observation
+        
         # Get all camera names from the model
         all_camera_names = [self.model.camera(i).name for i in range(self.model.ncam)]
 
@@ -175,34 +237,44 @@ class MuJoCoRobot: # Inherit from Robot if you have that base class
 
         width, height = 320, 240 # Define your desired image resolution for offscreen rendering
         
-        # Update the scene for rendering (using the objects initialized in __init__)
-        # Arguments: model, data, option, perturb, camera, category_mask (int), scene
-        mj.mjv_updateScene(self.model, self.data, self.vopt, self.pert, self.cam, 0, self.scn)
+        try:
+            # Update the scene for rendering (using the objects initialized in __init__)
+            # Arguments: model, data, option, perturb, camera, category_mask (int), scene
+            mj.mjv_updateScene(self.model, self.data, self.vopt, self.pert, self.cam, 0, self.scn)
 
-        # Prepare buffers for RGB and depth data
-        rgb_data = np.zeros((height, width, 3), dtype=np.uint8)
-        depth_data = np.zeros((height, width), dtype=np.float32)
+            # Prepare buffers for RGB and depth data
+            rgb_data = np.zeros((height, width, 3), dtype=np.uint8)
+            depth_data = np.zeros((height, width), dtype=np.float32)
 
-        # Render the scene to the buffers (using the context initialized in __init__)
-        viewport = mj.MjrRect(0, 0, width, height)
-        # Arguments: viewport, scene, context, RGB output, Depth output, segmentation output
-        mj.mjr_render(viewport, self.scn, self.mjr_context) # Render to internal buffer
+            # Render the scene to the buffers (using the context initialized in __init__)
+            viewport = mj.MjrRect(0, 0, width, height)
+            # Arguments: viewport, scene, context, RGB output, Depth output, segmentation output
+            mj.mjr_render(viewport, self.scn, self.mjr_context) # Render to internal buffer
 
-        # Read the pixels from MuJoCo's internal buffer into your numpy arrays
-        # Arguments: rgb_output_array, depth_output_array, viewport, context
-        # Note: rgb_data and depth_data are populated directly by this function
-        mj.mjr_readPixels(rgb_data, depth_data, viewport, self.mjr_context)    
-        # MuJoCo images are typically flipped vertically; flip them back for standard image processing
-        rgb_array = np.flipud(rgb_data)
+            # Read the pixels from MuJoCo's internal buffer into your numpy arrays
+            # Arguments: rgb_output_array, depth_output_array, viewport, context
+            # Note: rgb_data and depth_data are populated directly by this function
+            mj.mjr_readPixels(rgb_data, depth_data, viewport, self.mjr_context)    
+            # MuJoCo images are typically flipped vertically; flip them back for standard image processing
+            rgb_array = np.flipud(rgb_data)
 
-        # Combine numerical state and image data for observation
-        observation = {
-            "qpos": self.data.qpos.copy(),
-            "qvel": self.data.qvel.copy(),
-            "eef_pose": self.pose(), # Current end-effector pose
-            "camera.rgb": rgb_array
-        }
-        return observation
+            # Combine numerical state and image data for observation
+            observation = {
+                "qpos": self.data.qpos.copy(),
+                "qvel": self.data.qvel.copy(),
+                "eef_pose": self.pose(), # Current end-effector pose
+                "camera.rgb": rgb_array
+            }
+            return observation
+        except Exception as e:
+            print(f"WARNING: Failed to render camera image: {e}")
+            # Return observation without camera image if rendering fails
+            observation = {
+                "qpos": self.data.qpos.copy(),
+                "qvel": self.data.qvel.copy(),
+                "eef_pose": self.pose(), # Current end-effector pose
+            }
+            return observation
 
     def close(self):
         """
@@ -210,10 +282,13 @@ class MuJoCoRobot: # Inherit from Robot if you have that base class
         """
         if self.viewer is not None and self.viewer.is_running(): # Check if viewer is still running before closing
             self.viewer.close()
-        # Destroy MjrContext to free OpenGL resources
-        #if hasattr(self, 'mjr_context') and self.mjr_context is not None:
-        #     mj.mjr_freeContext(self.mjr_context) # Explicitly free the rendering context
-        #print("MuJoCo simulation closed.")
+        # Free the rendering context if it was initialized
+        if hasattr(self, 'mjr_context') and self.mjr_context is not None and self._offscreen_initialized:
+            try:
+                mj.mjr_freeContext(self.mjr_context)
+            except Exception as e:
+                print(f"WARNING: Failed to free rendering context: {e}")
+        print("MuJoCo simulation closed.")
 
 
 if __name__ == "__main__":
@@ -224,12 +299,18 @@ if __name__ == "__main__":
     # Verify your end-effector frame name in your xArm Lite 6 URDF
     end_effector_link_name = "link6" # Common for 6-axis robots, check your URDF!
 
+    sim = None
     # Create the simulation instance
     try:
         sim = MuJoCoRobot(mjcf_file, urdf_file_pinocchio, end_effector_link_name)
+        print("Initial qpos:", sim.data.qpos)
+        print("Initial qvel:", sim.data.qvel)
+        print("DEBUG: Robot initialization successful!")
     except Exception as e:
         print(f"Failed to initialize MuJoCoRobot: {e}")
-        exit()
+        if sim is not None:
+            sim.close()
+        exit(1)
 
     # Example simulation loop
     try:
@@ -243,6 +324,8 @@ if __name__ == "__main__":
             y = 0.05 * np.cos(current_sim_time * 1.0)
             z = 0.4
             target_pos = np.array([x, y, z])
+
+
 
             # Fixed orientation (e.g., end-effector pointing downwards)
             # This rotation matrix aligns the end-effector's Z-axis (pointing outwards) with world -Z
@@ -277,5 +360,10 @@ if __name__ == "__main__":
 
     except KeyboardInterrupt:
         print("Simulation interrupted by user.")
+    except Exception as e:
+        print(f"Error during simulation: {e}")
+        import traceback
+        traceback.print_exc()
     finally:
-        sim.close() # Ensure resources are cleaned up
+        if sim is not None:
+            sim.close() # Ensure resources are cleaned up
