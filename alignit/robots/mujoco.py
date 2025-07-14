@@ -20,10 +20,11 @@ class MuJoCoRobot:
             self.model.opt.timestep = 0.002  # Smaller timestep
             self.model.opt.iterations = 100    # More solver iterations
             self.model.opt.tolerance = 1e-10   # Solver tolerance
+            self.model.opt.solver = mj.mjtSolver.mjSOL_NEWTON  # Better solver
             
             # Add damping to all joints
             for i in range(self.model.nv):
-                self.model.dof_damping[i] = 0.1
+                self.model.dof_damping[i] = 2.0
                 
             print(f"DEBUG: Successfully loaded MuJoCo model from: {mjcf_path}")
         except Exception as e:
@@ -88,16 +89,16 @@ class MuJoCoRobot:
             print(f"WARNING: Failed offscreen rendering init: {e}")
 
     def _calculate_ik_pinocchio(self, target_pose_matrix):
-        """Stable IK solver with joint limit enforcement"""
+        """Improved IK implementation"""
         target_se3 = pin.SE3(target_pose_matrix[:3, :3], target_pose_matrix[:3, 3])
-        q = self.current_q_pin.copy()
+        q = self.current_q_pin.copy()  # Start from current configuration
         
-        # IK parameters
-        eps = 1e-6
-        IT_MAX = 100
-        DT = 1e-2
-        damp = 1e-3  # Increased damping for stability
-
+        # Parameters
+        eps = 1e-4
+        IT_MAX = 50  # Increased iterations
+        DT = 0.5     # Larger integration step
+        damp = 1e-6  # Reduced damping
+        
         for i in range(IT_MAX):
             pin.forwardKinematics(self.robot_pin.model, self.robot_pin.data, q)
             pin.updateFramePlacements(self.robot_pin.model, self.robot_pin.data)
@@ -108,29 +109,50 @@ class MuJoCoRobot:
             if np.linalg.norm(err) < eps:
                 break
 
+            # Try LOCAL instead of LOCAL_WORLD_ALIGNED
             J = pin.computeFrameJacobian(
                 self.robot_pin.model, self.robot_pin.data, q,
-                self.end_effector_frame_id_pin, 
-                pin.ReferenceFrame.LOCAL_WORLD_ALIGNED
+                self.end_effector_frame_id_pin,
+                pin.ReferenceFrame.LOCAL
             )
+        
+            # Reduced nullspace control
+            q_neutral = pin.neutral(self.robot_pin.model)
+            q_null = (q - q_neutral) * 0.01  # Smaller scaling factor
             
-            # Damped least-squares solution
-            dq = J.T @ np.linalg.solve(J @ J.T + damp * np.eye(6), err)
-            q = pin.integrate(self.robot_pin.model, q, dq * DT)
+            # Damped least-squares with reduced nullspace
+            dq = pin.Jlog6(current_se3.inverse() * target_se3) @ J
+            dq = np.linalg.solve(J.T @ J + damp * np.eye(J.shape[1]), J.T @ err)
+            dq = dq * DT + (np.eye(J.shape[1]) - np.linalg.pinv(J) @ J) @ q_null
             
-            # Enforce joint limits during iteration
-            for j in range(self.robot_pin.model.nq):
+            q += dq
+            
+            # Apply joint limits more carefully
+            for j in range(len(q)):
                 if self.model.jnt_limited[j]:
-                    q[j] = np.clip(q[j], 
-                                  self.model.jnt_range[j, 0], 
-                                  self.model.jnt_range[j, 1])
-
-        self.current_q_pin = q
+                    q[j] = np.clip(q[j],
+                                self.model.jnt_range[j, 0] + 0.05,
+                                self.model.jnt_range[j, 1] - 0.05)
+            print(f"IK Iteration {i}:")
+            print(f"- Error norm: {np.linalg.norm(err):.6f}")
+            print(f"- Current pose: {current_se3.translation}")
+            print(f"- Target pose: {target_se3.translation}")
+        
+        self.current_q_pin = q.copy()
         return q[self.robot_pin.nq-self.model.nu:]
 
     def send_action(self, action_pose_matrix):
         """Send action with joint limit checking"""
-        target_joint_poses = self._calculate_ik_pinocchio(action_pose_matrix)
+        self.model.site_pos[self.model.site("gripper_site").id] = action_pose_matrix[:3, 3]
+        self.model.site_quat[self.model.site("gripper_site").id] = t3d.quaternions.mat2quat(action_pose_matrix[:3, :3])
+        
+        base_pos = self.data.body("link_base").xpos
+        base_rot = self.data.body("link_base").xmat.reshape(3,3)
+        world_to_base = t3d.affines.compose(base_pos, base_rot, [1,1,1])
+        base_target = np.linalg.inv(world_to_base) @ action_pose_matrix
+
+        target_joint_poses = self._calculate_ik_pinocchio(base_target)
+        print("IK Output:", target_joint_poses)
         
         # Validate joint limits
         for i, q in enumerate(target_joint_poses):
@@ -210,7 +232,7 @@ class MuJoCoRobot:
             except:
                 pass
 
-if __name__ == "__main__":
+if __name__ == "__main__1":
     # Configuration
     mjcf_file = Path("/home/nikola/code/alignit/alignit/lite6mjcf.xml")
     urdf_file_pinocchio = Path("/home/nikola/code/alignit/alignit/lite6.urdf")
@@ -266,3 +288,101 @@ if __name__ == "__main__1":
     finally:
         if sim:
             sim.close()
+
+if __name__ == "__main__":
+    # Configuration
+    mjcf_file = Path("/home/nikola/code/alignit/alignit/lite6mjcf.xml")
+    urdf_file_pinocchio = Path("/home/nikola/code/alignit/alignit/lite6.urdf")
+    end_effector_link_name = "link6"
+
+    print("=== Initializing Simulation ===")
+    sim = None
+    try:
+        print("Loading MJCF and URDF...")
+        sim = MuJoCoRobot(mjcf_file, urdf_file_pinocchio, end_effector_link_name)
+        
+        # Get initial state
+        initial_pose = sim.pose()
+        initial_pos = initial_pose[:3, 3].copy()
+        initial_rot = initial_pose[:3, :3]
+        print(f"\nInitial End-Effector Position: {initial_pos}")
+        print(f"Initial Joint Angles (deg): {np.degrees(sim.data.qpos)}")
+        
+        # Motion parameters (10cm = 0.1m)
+        distance = 0.1  # 10 cm
+        duration = 5.0  # seconds per direction
+        steps = int(duration / sim.model.opt.timestep)
+        print(f"\nMotion Parameters:")
+        print(f"- Distance: {distance}m")
+        print(f"- Duration: {duration}s")
+        print(f"- Steps: {steps}")
+        print(f"- Timestep: {sim.model.opt.timestep}s")
+        
+        # Move forward and backward
+        for cycle in range(2):  # Do 2 complete cycles
+            for direction in [1, -1]:
+                dir_name = "forward" if direction > 0 else "backward"
+                print(f"\n=== Cycle {cycle+1} {dir_name} movement ===")
+                
+                for t_step in range(steps):
+                    # Calculate target
+                    progress = t_step / steps
+                    target_pos = initial_pos.copy()
+                    target_pos[0] += direction * distance * progress
+                    
+                    print(f"\nStep {t_step}/{steps}:")
+                    print(f"- Target X position: {target_pos[0]:.4f}m")
+                    print(f"- Progress: {progress*100:.1f}%")
+                    
+                    # Create pose matrix
+                    pose = t3d.affines.compose(target_pos, initial_rot, [1, 1, 1])
+                    
+                    # Send action with debug
+                    print("Calling send_action()...")
+                    success = sim.send_action(pose)
+                    
+                    # Get current state
+                    current_pose = sim.pose()
+                    current_pos = current_pose[:3, 3]
+                    current_joints = np.degrees(sim.data.qpos)
+                    print(f"Current State:")
+                    print(f"- Actual X position: {current_pos[0]:.4f}m")
+                    print(f"- Joint angles (deg): {current_joints}")
+                    
+                    if not success:
+                        print("!!! Movement failed - check joint limits !!!")
+                        # Detailed joint limit check
+                        print("\nJoint Limit Status:")
+                        for j in range(sim.model.nq):
+                            if sim.model.jnt_limited[j]:
+                                limit_min = np.degrees(sim.model.jnt_range[j,0])
+                                limit_max = np.degrees(sim.model.jnt_range[j,1])
+                                current = current_joints[j]
+                                status = "OK" if limit_min <= current <= limit_max else "VIOLATION"
+                                print(f"Joint {j}: {current:.2f}° (Limits: {limit_min:.2f} to {limit_max:.2f}) - {status}")
+                        break
+                    
+                    if not sim.viewer.is_running():
+                        print("Viewer window closed")
+                        break
+                    
+                    # Slow down for visualization
+                    time.sleep(sim.model.opt.timestep)
+                
+                if not success:
+                    break  # Stop entire simulation if movement failed
+            
+            if not success or not sim.viewer.is_running():
+                break
+
+    except Exception as e:
+        print(f"\n!!! Exception occurred: {str(e)}")
+        import traceback
+        traceback.print_exc()
+    finally:
+        if sim:
+            print("\nClosing simulation...")
+            sim.close()
+    print("Simulation ended")
+
+
