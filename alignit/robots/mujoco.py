@@ -33,10 +33,10 @@ class MuJoCoRobot: # Inherit from Robot if you have that base class
         mj.mjv_defaultOption(self.vopt)                   # Set default visualization options
         self.pert = mj.MjvPerturb()                       # Perturbation object (for interactive control)
         mj.mjv_defaultPerturb(self.pert)                  # Set default perturbation options
+        #self.mjr_context = mj.MjrContext(self.model, mj.mjtFontScale.mjFONTSCALE_150)        #mj.mjr_defaultContext(self.mjr_context)          # Set default rendering context properties
+        print("DEBUG: Offscreen rendering objects initialized.")
         self.mjr_context = mj.MjrContext()                # Rendering context
         #mj.mjr_defaultContext(self.mjr_context)          # Set default rendering context properties
-
-        print("DEBUG: Offscreen rendering objects initialized.")
 
 
         # Get joint IDs for control (assuming 6 joints for xArm Lite 6)
