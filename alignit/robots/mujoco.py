@@ -38,9 +38,9 @@ class MuJoCoRobot:
             self.data = mj.MjData(self.model)
             
             # Configure simulation for stability and accuracy
-            self.model.opt.timestep = 0.0005
-            self.model.opt.iterations = 500
-            self.model.opt.tolerance = 1e-12
+            self.model.opt.timestep = 0.1
+            self.model.opt.iterations = 50
+            self.model.opt.tolerance = 1e-8
             self.model.opt.solver = mj.mjtSolver.mjSOL_NEWTON
             
             # Add damping to all joints to improve stability and prevent oscillations
@@ -237,9 +237,9 @@ class MuJoCoRobot:
         q = self.current_q_pin.copy()  
         
         eps = 1e-4   
-        IT_MAX = 5000 # Increased iterations for better convergence
+        IT_MAX = 10000 # Increased iterations for better convergence
         DT = 0.01     # Reduced IK step size for smoother trajectory
-        damp = 1e-3  
+        damp = 1e-2  # Increased damping for better stability
         
         self.logger.debug("\nStarting IK calculation with Pinocchio...")
         for i in range(IT_MAX):
@@ -250,7 +250,7 @@ class MuJoCoRobot:
             err = pin.log6(current_se3.inverse() * target_se3).vector 
             
             error_norm = np.linalg.norm(err)
-            # self.logger.debug(f"  IK Iteration {i}: Error norm = {error_norm:.6f}") # Uncomment for detailed IK per-iteration debug
+            self.logger.debug(f"  IK Iteration {i}: Error norm = {error_norm:.6f}") # Uncommented for detailed IK per-iteration debug
 
             if error_norm < eps:
                 self.logger.debug(f"IK converged in {i} iterations. Final error norm: {error_norm:.6f}")
@@ -351,7 +351,7 @@ class MuJoCoRobot:
         current_joint_qpos = self.data.qpos[self.mujoco_qpos_indices_for_actuators]
 
         # Define a maximum joint velocity (radians per second) or a maximum position change per step.
-        max_joint_vel = np.deg2rad(100) # Max 100 degrees per second for joints
+        max_joint_vel = np.deg2rad(2000) # Increased max joint velocity for faster movement
         max_angle_change_per_step = max_joint_vel * self.model.opt.timestep
         
         # Calculate the desired change for this step
@@ -609,7 +609,8 @@ if __name__ == "__main__":
                                 main_logger.info(f"    Joint '{sim.model.joint(mujoco_joint_id).name}' (ID: {mujoco_joint_id}): {current:.2f}° (Limits: {limit_min:.2f} to {limit_max:.2f}°) - {status}")
                         break 
                     
-                    time.sleep(sim.model.opt.timestep) # Sleep for simulation timestep to control real-time speed
+                    # Removed time.sleep to allow simulation to run at maximum speed
+                    # time.sleep(sim.model.opt.timestep) 
                 
                 if not success or not sim.viewer.is_running():
                     break 
