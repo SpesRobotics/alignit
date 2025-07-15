@@ -24,14 +24,14 @@ class MuJoCoRobot:
             self.data = mj.MjData(self.model)
             
             # Configure simulation for stability and accuracy
-            self.model.opt.timestep = 0.002  # Smaller timestep for more precise integration
-            self.model.opt.iterations = 100    # More solver iterations for better constraint satisfaction
-            self.model.opt.tolerance = 1e-10   # Solver tolerance
+            self.model.opt.timestep = 0.0005  # Smaller timestep for more precise integration
+            self.model.opt.iterations = 500    # More solver iterations for better constraint satisfaction
+            self.model.opt.tolerance = 1e-12  # Solver tolerance
             self.model.opt.solver = mj.mjtSolver.mjSOL_NEWTON  # Use Newton solver for better convergence
             
             # Add damping to all joints to improve stability and prevent oscillations
             for i in range(self.model.nv): # nv is the number of degrees of freedom (qpos size)
-                self.model.dof_damping[i] = 5.0
+                self.model.dof_damping[i] = 0.1
                 
             print(f"DEBUG: Successfully loaded MuJoCo model from: {mjcf_path}")
             print(f"DEBUG: MuJoCo model has {self.model.nv} degrees of freedom (qpos size).")
@@ -311,7 +311,7 @@ class MuJoCoRobot:
         # Assign the calculated joint positions to MuJoCo's control inputs.
         # This is where the robot's actual movement is commanded.
         self.data.ctrl[self.mujoco_actuator_ids] = target_joint_poses
-        
+        print(f"DEBUG: MuJoCo data.ctrl after assignment: {self.data.ctrl}")
         # Step the MuJoCo simulation forward by one timestep.
         mj.mj_step(self.model, self.data)
         
