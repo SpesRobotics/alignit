@@ -31,7 +31,7 @@ class MuJoCoRobot:
             
             # Add damping to all joints to improve stability and prevent oscillations
             for i in range(self.model.nv): # nv is the number of degrees of freedom (qpos size)
-                self.model.dof_damping[i] = 2.0
+                self.model.dof_damping[i] = 5.0
                 
             print(f"DEBUG: Successfully loaded MuJoCo model from: {mjcf_path}")
             print(f"DEBUG: MuJoCo model has {self.model.nv} degrees of freedom (qpos size).")
@@ -82,7 +82,7 @@ class MuJoCoRobot:
         # Create a map from Pinocchio joint name to its starting index in Pinocchio's 'q' vector.
         # Pinocchio's model.njoints is the number of actual joints (excluding the universe joint at index 0).
         pinocchio_joint_name_to_q_idx_map = {}
-        # Iterate through all joints in the Pinocchio model, skipping the 'universe' joint (index 0).
+        #Iterate through all joints in the Pinocchio model, skipping the 'universe' joint (index 0).
         for joint_id in range(1, self.robot_pin.model.njoints): 
             # Get the JointModel object for the current joint_id
             joint_model = self.robot_pin.model.joints[joint_id]
@@ -129,6 +129,19 @@ class MuJoCoRobot:
             mj.mj_step(self.model, self.data)
             self.data.ctrl[:] = 0 # Ensure controls are zeroed during warmup
 
+        print("DEBUG: MuJoCo model loaded. Checking actuator properties:")
+        for i in range(self.model.nu):
+            actuator_name = self.model.actuator(i).name
+            joint_id = self.model.actuator_trnid[i, 0]  # Get the joint ID controlled by this actuator
+            if joint_id != -1: # It's a joint actuator
+                joint_name = self.model.joint(joint_id).name
+                forcerange = self.model.actuator(i).forcerange # Access forcerange directly
+                stiffness = self.model.joint(joint_id).stiffness # Access stiffness directly
+                print(f"  Actuator '{actuator_name}' (controls joint '{joint_name}'): Forcerange={forcerange}, Stiffness={stiffness}")
+            else:
+                print(f"  Actuator '{actuator_name}' (not controlling a joint or unknown type)")
+
+
     def _initialize_offscreen_rendering(self):
         """
         Lazy initialization of offscreen rendering components for camera observations.
@@ -172,7 +185,7 @@ class MuJoCoRobot:
         eps = 1e-4   # Convergence tolerance: IK stops when error norm is below this
         IT_MAX = 100 # Maximum number of iterations for the IK solver
         DT = 0.5     # Integration step for updating 'q' (larger steps can converge faster but risk instability)
-        damp = 1e-6  # Damping factor for DLS, helps with singularities
+        damp = 1e-3  # Damping factor for DLS, helps with singularities
         
         print("\nDEBUG: Starting IK calculation with Pinocchio...")
         for i in range(IT_MAX):
@@ -268,7 +281,7 @@ class MuJoCoRobot:
         # This is a critical step to prevent the robot from trying to move into invalid poses.
         for i, actuator_id in enumerate(self.mujoco_actuator_ids):
             q_target_for_this_actuator = target_joint_poses[i]
-            
+            print("q target for actuator", actuator_id, ":", np.degrees(q_target_for_this_actuator), "degrees")
             # Get the MuJoCo joint ID that this specific actuator controls.
             # Corrected: Get joint name from actuator name, then get joint ID from model.
             actuator_name = self.model.actuator(actuator_id).name
@@ -280,7 +293,8 @@ class MuJoCoRobot:
             if self.model.jnt_limited[mujoco_joint_id]: 
                 lower_limit = self.model.jnt_range[mujoco_joint_id, 0]
                 upper_limit = self.model.jnt_range[mujoco_joint_id, 1]
-                
+                print("lower limit:", np.degrees(lower_limit), "degrees")
+                print("upper limit:", np.degrees(upper_limit), "degrees")
                 # Add a small buffer to the limits. This helps to:
                 # 1. Account for numerical precision issues in IK.
                 # 2. Prevent the robot from getting stuck exactly at the limit, which can cause instability.
@@ -427,7 +441,6 @@ if __name__ == "__main__":
         print(f"- Duration per direction: {duration}s")
         print(f"- Total simulation steps per direction: {steps}")
         print(f"- Simulation Timestep: {sim.model.opt.timestep}s")
-        
         # --- Main Simulation Loop: Move Forward and Backward ---
         for cycle in range(2):  # Perform 2 complete cycles (forward then backward, then forward then backward)
             for direction in [1, -1]: # 1 for moving forward (positive X), -1 for moving backward (negative X)
