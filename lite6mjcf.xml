@@ -2,7 +2,7 @@
   <default>
     <default class="robot">
       <default class="motor">
-        <joint stiffness="570" damping="100"/>  <!-- Increased stiffness -->
+        <joint stiffness="590" damping="100"/>  <!-- Increased stiffness -->
         <motor ctrlrange="-10 10" ctrllimited="true" forcerange="-500000 500000"/>
       </default>
       <default class="visual">
@@ -36,31 +36,31 @@
   <worldbody>
     <body name="link_base" pos="0.00000000 0.00000000 0.00000000" quat="1 0 0 0" childclass="robot">
     <geom type="mesh" mesh="base_mesh" rgba="0.6 0.6 0.6 1"/>
-      <inertial pos="0 0 0" mass="1.0" diaginertia="0.01 0.01 0.01"/>
+      <inertial pos="0 0 0" mass="2.5" diaginertia="0.01 0.01 0.01"/>
       <body name="link1" pos="0 0 0.2435" quat="1.0 0.0 0.0 0.0">
         <geom type="mesh" mesh="link1_mesh" rgba="0.6 0.6 0.6 1"/>
         <joint name="joint1" type="hinge" ref="0.0" class="motor" range="-6.28319 6.28319" axis="0 0 1" />
-        <inertial pos="0 0 0" quat="1.0 0.0 0.0 0.0" mass="0.5" diaginertia="1e-05 1e-05 1e-05" />
+        <inertial pos="0 0 0" quat="1.0 0.0 0.0 0.0" mass="2.0" diaginertia="1e-05 1e-05 1e-05" />
         <body name="link2" pos="0 0 0" quat="0.5000037354821706 -0.49999840251375804 -0.5000019278969003 -0.4999959340704164">
         <geom type="mesh" mesh="link2_mesh" rgba="0.6 0.6 0.6 1"/>
           <joint name="joint2" type="hinge" ref="0.0" class="motor" range="-2.61799 2.61799" axis="0.000001 0 1" />
-          <inertial pos="0 0 0" quat="1.0 0.0 0.0 0.0" mass="0.5" diaginertia="1e-05 1e-05 1e-05" />
+          <inertial pos="0 0 0" quat="1.0 0.0 0.0 0.0" mass="1.8" diaginertia="1e-05 1e-05 1e-05" />
           <body name="link3" pos="0.2002 0 0" quat="2.7059462988343167e-06 0.7071051289519305 0.7071084334069488 2.705958944305917e-06">
             <geom type="mesh" mesh="link3_mesh" rgba="0.6 0.6 0.6 1"/>
             <joint name="joint3" type="hinge" ref="0.0" class="motor" range="-0.061087 5.23599" axis="0 -0.000001 1" />
-            <inertial pos="0 0 0" quat="1.0 0.0 0.0 0.0" mass="0.5" diaginertia="1e-05 1e-05 1e-05" />
+            <inertial pos="0 0 0" quat="1.0 0.0 0.0 0.0" mass="1.2" diaginertia="1e-05 1e-05 1e-05" />
             <body name="link4" pos="0.087 -0.22761 0" quat="0.7071054825112363 0.7071080798594735 0.0 0.0">
             <geom type="mesh" mesh="link4_mesh" rgba="0.6 0.6 0.6 1"/>
               <joint name="joint4" type="hinge" ref="0.0" class="motor" range="-6.28319 6.28319" axis="0 0 1" />
-              <inertial pos="0 0 0" quat="1.0 0.0 0.0 0.0" mass="0.5" diaginertia="1e-05 1e-05 1e-05" />
+              <inertial pos="0 0 0" quat="1.0 0.0 0.0 0.0" mass="0.7" diaginertia="1e-05 1e-05 1e-05" />
               <body name="link5" pos="0 0 0" quat="0.7071054825112363 0.7071080798594735 0.0 0.0">
               <geom type="mesh" mesh="link1_mesh" rgba="0.6 0.6 0.6 1"/>
                 <joint name="joint5" type="hinge" ref="0.0" class="motor" range="-2.1642 2.1642" axis="0 0 1" />
-                <inertial pos="0 0 0" quat="1.0 0.0 0.0 0.0" mass="0.5" diaginertia="1e-05 1e-05 1e-05" />
+                <inertial pos="0 0 0" quat="1.0 0.0 0.0 0.0" mass="0.2" diaginertia="1e-05 1e-05 1e-05" />
                 <body name="link6" pos="0 0.0625 0" quat="0.7071054825112363 -0.7071080798594735 0.0 0.0">
                   <geom type="mesh" mesh="xarm_link6_mesh" rgba="0.6 0.6 0.6 1"/>
                   <joint name="joint6" type="hinge" ref="0.0" class="motor" range="-6.28319 6.28319" axis="0 0 1" />
-                    <inertial pos="0 0 0" mass="0.5" diaginertia="0.001 0.001 0.001"/> <site name="gripper_site" pos="0 0 0.1" size="0.01 0.01 0.01" rgba="1 0 0 1"/>
+                    <inertial pos="0 0 0" mass="0.1" diaginertia="0.001 0.001 0.001"/> <site name="gripper_site" pos="0 0 0.1" size="0.01 0.01 0.01" rgba="1 0 0 1"/>
                 </body>
               </body>
             </body>
