@@ -17,22 +17,20 @@ logging.basicConfig(level=logging.INFO,
 # Get a logger for the current module for top-level messages
 main_logger = logging.getLogger(__name__)
 
+# --- Pinocchio specific import ---
+from pinocchio import RobotWrapper 
+
 class MuJoCoRobot:
-    # Removed debug_mode parameter, as logging handles this now
     def __init__(self, mjcf_path, urdf_path_pinocchio, end_effector_frame_name_pinocchio):
         """
         Initializes the MuJoCo simulation environment and the Pinocchio robot model.
 
         Args:
-            mjcf_path (Path): Path to the MuJoCo MJCF model file.
-            urdf_path_pinocchio (Path): Path to the URDF model file for Pinocchio.
+            mjcf_path (Path): Path to the MuJoCo MJCF model file (e.g., scene.xml).
+            urdf_path_pinocchio (Path): Path to the URDF model file for Pinocchio (e.g., lite6.urdf).
             end_effector_frame_name_pinocchio (str): Name of the end-effector frame in the Pinocchio model.
         """
-        # Get a specific logger for this class instance
         self.logger = logging.getLogger(self.__class__.__name__)
-        # Optionally, you can set a specific level for this logger if you want it
-        # to be more or less verbose than the root logger.
-        # Example: self.logger.setLevel(logging.DEBUG) # Uncomment to see debug from ONLY this class
 
         # --- MuJoCo setup ---
         try:
@@ -40,20 +38,48 @@ class MuJoCoRobot:
             self.data = mj.MjData(self.model)
             
             # Configure simulation for stability and accuracy
-            self.model.opt.timestep = 0.0005# Smaller timestep for more precise integration
-            self.model.opt.iterations = 500   # More solver iterations for better constraint satisfaction
-            self.model.opt.tolerance = 1e-12  # Solver tolerance
-            self.model.opt.solver = mj.mjtSolver.mjSOL_NEWTON  # Use Newton solver for better convergence
+            self.model.opt.timestep = 0.0005
+            self.model.opt.iterations = 500
+            self.model.opt.tolerance = 1e-12
+            self.model.opt.solver = mj.mjtSolver.mjSOL_NEWTON
             
             # Add damping to all joints to improve stability and prevent oscillations
-            for i in range(self.model.nv): # nv is the number of degrees of freedom (qpos size)
-                self.model.dof_damping[i] = 0.1
+            for i in range(self.model.nv):
+                self.model.dof_damping[i] = 0.5 # Increased damping for better stability
                 
-            self.logger.debug(f"Successfully loaded MuJoCo model from: {mjcf_path}")
-            self.logger.debug(f"MuJoCo model has {self.model.nv} degrees of freedom (qpos size).")
-            self.logger.debug(f"MuJoCo model has {self.model.nu} actuators (ctrl size).")
+            self.logger.info(f"Successfully loaded MuJoJo model from: {mjcf_path}")
+            self.logger.info(f"MuJoCo model has {self.model.nq} generalized coordinates (qpos size).")
+            self.logger.info(f"MuJoCo model has {self.model.nv} degrees of freedom (qvel size).")
+            self.logger.info(f"MuJoCo model has {self.model.nu} actuators (ctrl size).")
+
+            # --- Log all actuator names to debug potential empty names ---
+            self.logger.info("MuJoCo Actuator Names (from model.actuator(i).name):")
+            for j in range(self.model.nu):
+                act_name = self.model.actuator(j).name
+                self.logger.info(f"  Actuator {j}: '{act_name}'")
+                if not act_name:
+                    self.logger.warning(f"  WARNING: Actuator at index {j} has an empty name in the MJCF model!")
+
+
+            # --- Identify End-Effector in MuJoCo ---
+            # For scene.xml, 'gripper_site' might not exist. 'link6' is a common body name.
+            try:
+                # Try to use a site first if it exists and is defined in the model
+                # The Lite6 menagerie scene.xml doesn't define a 'gripper_site'
+                self.eef_id_type = 'site'
+                self.eef_id = self.model.site("gripper_site").id
+                self.logger.info("Using 'gripper_site' as MuJoCo end-effector.")
+            except KeyError:
+                try:
+                    # Fallback to using the body ID if 'gripper_site' is not found
+                    self.eef_id_type = 'body'
+                    self.eef_id = self.model.body("link6").id # Common for Lite6
+                    self.logger.info("Using 'link6' body as MuJoCo end-effector.")
+                except KeyError:
+                    self.logger.critical("Neither 'gripper_site' nor 'link6' body found in MuJoCo model for end-effector. Please check your MJCF.")
+                    raise RuntimeError("MuJoCo end-effector not found.")
+
         except Exception as e:
-            # Use logger.exception() to automatically include traceback info
             self.logger.critical(f"Failed to load MuJoCo model from {mjcf_path}: {e}", exc_info=True)
             raise RuntimeError(f"Failed to load MuJoCo model from {mjcf_path}: {e}")
 
@@ -61,7 +87,6 @@ class MuJoCoRobot:
         self.logger.debug("MuJoCo passive viewer launched.")
 
         # --- Offscreen rendering setup (lazy initialization) ---
-        # These variables are initialized only when get_observation is called without a viewer
         self.scn = None
         self.cam = None
         self.vopt = None
@@ -69,19 +94,15 @@ class MuJoCoRobot:
         self.mjr_context = None
         self._offscreen_initialized = False
 
-        # Get the ID of the end-effector site in the MuJoCo model
-        self.eef_site_id = self.model.site("gripper_site").id
-        
         # --- Pinocchio setup ---
         try:
-            self.robot_pin = pin.RobotWrapper.BuildFromURDF(str(urdf_path_pinocchio))
-            # Get the ID of the end-effector frame in the Pinocchio model
+            self.robot_pin = RobotWrapper.BuildFromURDF(str(urdf_path_pinocchio))
             self.end_effector_frame_id_pin = self.robot_pin.model.getFrameId(end_effector_frame_name_pinocchio)
             if self.end_effector_frame_id_pin == self.robot_pin.model.nframes:
                 raise ValueError(f"End-effector frame '{end_effector_frame_name_pinocchio}' not found in Pinocchio model.")
-            self.logger.debug(f"Pinocchio model loaded from: {urdf_path_pinocchio}")
-            self.logger.debug(f"Pinocchio model has {self.robot_pin.model.nq} generalized coordinates (q size).")
-            self.logger.debug(f"Pinocchio model has {self.robot_pin.model.nv} velocity dimensions (v size).")
+            self.logger.info(f"Pinocchio model loaded from: {urdf_path_pinocchio}")
+            self.logger.info(f"Pinocchio model has {self.robot_pin.model.nq} generalized coordinates (q size).")
+            self.logger.info(f"Pinocchio model has {self.robot_pin.model.nv} velocity dimensions (v size).")
         except Exception as e:
             self.logger.critical(f"Failed to initialize Pinocchio: {e}", exc_info=True)
             raise RuntimeError(f"Failed to initialize Pinocchio: {e}")
@@ -92,47 +113,70 @@ class MuJoCoRobot:
         # --- Map MuJoCo actuators to Pinocchio joint indices ---
         self.mujoco_actuator_ids = []
         self.mujoco_actuator_to_pinocchio_q_idx = [] 
-        
+        self.mujoco_qpos_indices_for_actuators = [] # Store MuJoCo qpos index for each actuated joint
+
         pinocchio_joint_name_to_q_idx_map = {}
-        for joint_id in range(1, self.robot_pin.model.njoints): 
+        self.logger.info("\nPinocchio Joint Names and their q_indices:")
+        for joint_id in range(1, self.robot_pin.model.njoints): # Skip universe joint (id 0)
             joint_model = self.robot_pin.model.joints[joint_id]
             joint_name = self.robot_pin.model.names[joint_id] 
             pinocchio_joint_name_to_q_idx_map[joint_name] = joint_model.idx_q
+            self.logger.info(f"  Pinocchio Joint: '{joint_name}' (ID: {joint_id}), Q Index: {joint_model.idx_q}")
 
-        self.logger.debug(f"Pinocchio Joint Name to q_idx Map: {pinocchio_joint_name_to_q_idx_map}")
+        self.logger.info("\nAttempting to map MuJoCo actuators to Pinocchio joints:")
 
         for i in range(self.model.nu): 
-            actuator_name = self.model.actuator(i).name
+            actuator_name = self.model.actuator(i).name # This might be empty, but we'll use the joint name for mapping
             
-            if actuator_name.endswith("_ctrl"):
-                joint_name_from_actuator = actuator_name.replace("_ctrl", "")
-                
-                if joint_name_from_actuator in pinocchio_joint_name_to_q_idx_map:
-                    self.mujoco_actuator_ids.append(self.model.actuator(actuator_name).id)
-                    self.mujoco_actuator_to_pinocchio_q_idx.append(pinocchio_joint_name_to_q_idx_map[joint_name_from_actuator])
-                else:
-                    self.logger.warning(f"MuJoCo actuator '{actuator_name}' does not have a corresponding Pinocchio joint '{joint_name_from_actuator}'. Skipping this actuator.")
+            # Removed: if not actuator_name: continue (as the joint name is what matters for mapping)
+            
+            mujoco_joint_id = self.model.actuator_trnid[i, 0] 
+            
+            if mujoco_joint_id == -1: 
+                self.logger.warning(f"MuJoCo actuator '{actuator_name}' (index {i}) does not control a standard joint (mujoco_joint_id is -1). Skipping.")
+                continue
+
+            mujoco_joint_name = self.model.joint(mujoco_joint_id).name
+            self.logger.info(f"  Processing MuJoCo Actuator '{actuator_name}' (index {i}), linked to MuJoCo Joint '{mujoco_joint_name}' (ID: {mujoco_joint_id}).")
+
+
+            if mujoco_joint_name in pinocchio_joint_name_to_q_idx_map:
+                self.mujoco_actuator_ids.append(self.model.actuator(i).id) 
+                self.mujoco_actuator_to_pinocchio_q_idx.append(pinocchio_joint_name_to_q_idx_map[mujoco_joint_name])
+                self.mujoco_qpos_indices_for_actuators.append(self.model.joint(mujoco_joint_id).qposadr[0])
+                self.logger.info(f"    SUCCESS: Mapped MuJoCo joint '{mujoco_joint_name}' to Pinocchio joint.")
             else:
-                self.logger.warning(f"MuJoCo actuator '{actuator_name}' does not follow '_ctrl' naming convention. Skipping this actuator.")
-        
-        if len(self.mujoco_actuator_ids) != self.model.nu:
-            self.logger.warning(f"Mismatch in number of mapped actuators. MuJoCo has {self.model.nu} actuators, but only {len(self.mujoco_actuator_ids)} were successfully mapped to Pinocchio joints.")
+                self.logger.warning(f"    WARNING: MuJoCo joint '{mujoco_joint_name}' (controlled by actuator '{actuator_name}' at index {i}) DOES NOT have a corresponding Pinocchio joint with the same name. Skipping this actuator.")
         
         if not self.mujoco_actuator_ids:
-            self.logger.critical("No MuJoCo actuators were successfully mapped. Please check your URDF/MJCF joint and actuator naming conventions.")
-            raise RuntimeError("No MuJoCo actuators were successfully mapped. Please check your URDF/MJCF joint and actuator naming conventions.")
-        
-        self.logger.debug(f"Mapped MuJoCo Actuator IDs: {self.mujoco_actuator_ids}")
-        self.logger.debug(f"Corresponding Pinocchio q indices for mapped actuators: {self.mujoco_actuator_to_pinocchio_q_idx}")
+            self.logger.critical("No MuJoCo actuators were successfully mapped to Pinocchio joints. IK will not function. Please check your URDF/MJCF joint and actuator naming conventions.")
+        else:
+            self.num_mapped_joints = len(self.mujoco_actuator_ids)
+            self.logger.info(f"Successfully mapped {self.num_mapped_joints} MuJoCo actuators to Pinocchio joints.")
+            self.logger.debug(f"Mapped MuJoCo Actuator IDs: {self.mujoco_actuator_ids}")
+            self.logger.debug(f"Corresponding Pinocchio q indices for mapped actuators: {self.mujoco_actuator_to_pinocchio_q_idx}")
+            self.logger.debug(f"Corresponding MuJoCo qpos indices for mapped actuators: {self.mujoco_qpos_indices_for_actuators}")
+
 
         # --- Initializing MuJoCo qpos to a valid starting pose ---
-        initial_qpos_rad = np.array([0.0, 0.0, np.deg2rad(5.0), 0.0, 0.0, 0.0])
-        self.data.qpos[:] = initial_qpos_rad
+        # Reset data to model's default initial state first.
+        mj.mj_resetData(self.model, self.data)
+        
+        # If the model has at least 6 DOFs (for the Lite6), set its initial pose.
+        # This assumes the Lite6 joints are the first 6 DOFs in the scene.xml's qpos.
+        if self.model.nq >= 6:
+            initial_robot_qpos_rad = np.array([0.0, 0.0, np.deg2rad(5.0), 0.0, 0.0, 0.0])
+            # Ensure we don't try to set more qpos than available
+            num_to_set = min(len(initial_robot_qpos_rad), self.model.nq)
+            self.data.qpos[0:num_to_set] = initial_robot_qpos_rad[0:num_to_set]
+            self.logger.info(f"Initial MuJoCo qpos for first {num_to_set} joints set to: {np.degrees(self.data.qpos[0:num_to_set])} degrees")
+        else:
+            self.logger.warning(f"MuJoCo model has fewer than 6 generalized coordinates ({self.model.nq}). Robot-specific initial pose not set.")
+        
         mj.mj_forward(self.model, self.data) # Propagate this initial state through the model
         
-        self.logger.debug(f"Initial MuJoCo qpos set to: {np.degrees(self.data.qpos)} degrees")
         self.viewer.sync() # Update viewer to show initial pose
-        time.sleep(1.0) # Pause to see initial pose
+        time.sleep(1.0) # Pause to see initial pose (can be removed later)
 
         # --- Warmup simulation ---
         for _ in range(10):
@@ -185,12 +229,16 @@ class MuJoCoRobot:
         Returns:
             np.ndarray: The full Pinocchio configuration vector (q) for the robot.
         """
+        if not self.mujoco_actuator_ids: # If no actuators mapped, IK cannot work
+            self.logger.error("IK cannot be calculated: No MuJoCo actuators mapped to Pinocchio joints.")
+            return self.current_q_pin # Return current Pinocchio pose
+
         target_se3 = pin.SE3(target_pose_matrix[:3, :3], target_pose_matrix[:3, 3])
         q = self.current_q_pin.copy()  
         
         eps = 1e-4   
-        IT_MAX = 100 
-        DT = 0.5     
+        IT_MAX = 5000 # Increased iterations for better convergence
+        DT = 0.01     # Reduced IK step size for smoother trajectory
         damp = 1e-3  
         
         self.logger.debug("\nStarting IK calculation with Pinocchio...")
@@ -210,7 +258,7 @@ class MuJoCoRobot:
 
             J = pin.computeFrameJacobian(
                 self.robot_pin.model, self.robot_pin.data, q,
-                self.end_effector_frame_id_pin,
+                self.end_effector_frame_id_pin, # Ensure this uses the correct frame ID
                 pin.ReferenceFrame.LOCAL
             )
             
@@ -245,44 +293,111 @@ class MuJoCoRobot:
         Returns:
             bool: True if the action was successfully sent and within joint limits, False otherwise.
         """
-        self.model.site_pos[self.model.site("gripper_site").id] = action_pose_matrix[:3, 3]
-        self.model.site_quat[self.model.site("gripper_site").id] = t3d.quaternions.mat2quat(action_pose_matrix[:3, :3])
+        # If no actuators are mapped, we cannot send actions to the robot.
+        if not self.mujoco_actuator_ids:
+            self.logger.error("Cannot send action: No MuJoCo actuators mapped to Pinocchio joints.")
+            return False
+
+        # Optional: Visualize the target in MuJoCo if a 'gripper_site' exists
+        # Note: The Lite6 menagerie scene.xml typically does NOT have a 'gripper_site'
+        # If you want to visualize the target, you'd need to add a site to your scene.xml
+        # or dynamically create a geom in the viewer.
+        # if self.eef_id_type == 'site':
+        #     self.model.site_pos[self.eef_id] = action_pose_matrix[:3, 3]
+        #     self.model.site_quat[self.eef_id] = t3d.quaternions.mat2quat(action_pose_matrix[:3, :3])
         
-        base_pos = self.data.body("link_base").xpos
-        base_rot = self.data.body("link_base").xmat.reshape(3,3)
+        # Ensure 'link_base' exists in the scene.xml
+        try:
+            base_pos = self.data.xpos[self.model.body("link_base").id]
+            base_rot = self.data.xmat[self.model.body("link_base").id].reshape(3,3)
+        except KeyError:
+            self.logger.error("Body 'link_base' not found in MuJoCo model. Cannot calculate IK relative to base.")
+            return False
+
         world_to_base = t3d.affines.compose(base_pos, base_rot, [1,1,1])
         base_target = np.linalg.inv(world_to_base) @ action_pose_matrix
 
         full_pinocchio_q = self._calculate_ik_pinocchio(base_target)
         
+        # Ensure target_joint_poses has the correct size based on mapped actuators
+        # This check should be against the number of *mapped* Pinocchio joints, not necessarily full_pinocchio_q length
+        if len(self.mujoco_actuator_to_pinocchio_q_idx) == 0: # If no joints mapped, IK result is irrelevant
+             self.logger.error("No Pinocchio joints mapped to MuJoCo actuators. Cannot process IK result.")
+             return False
+        
+        # This check is more accurate: ensure the indices are valid for full_pinocchio_q
+        # Find the maximum index requested from full_pinocchio_q
+        max_pin_idx_requested = -1
+        if self.mujoco_actuator_to_pinocchio_q_idx: # Check if list is not empty
+            max_pin_idx_requested = max(self.mujoco_actuator_to_pinocchio_q_idx)
+
+        if max_pin_idx_requested >= len(full_pinocchio_q):
+            self.logger.error(f"Pinocchio IK result (full_pinocchio_q) has size {len(full_pinocchio_q)}, but indices up to {max_pin_idx_requested} are requested by mapped actuators. Data access error.")
+            return False
+
         target_joint_poses = np.array([full_pinocchio_q[idx] for idx in self.mujoco_actuator_to_pinocchio_q_idx])
         
         self.logger.debug(f"IK calculated target_joint_poses (for MuJoCo actuators, shape: {target_joint_poses.shape}): {np.degrees(target_joint_poses)}")
         
+        # Get current joint positions from MuJoCo using the *correct* qpos indices for the mapped actuators
+        # Ensure current_joint_qpos has the correct size
+        max_mujoco_qpos_idx_requested = -1
+        if self.mujoco_qpos_indices_for_actuators: # Check if list is not empty
+            max_mujoco_qpos_idx_requested = max(self.mujoco_qpos_indices_for_actuators)
+
+        if max_mujoco_qpos_idx_requested >= len(self.data.qpos):
+            self.logger.error(f"MuJoCo qpos array has size {len(self.data.qpos)}, but indices up to {max_mujoco_qpos_idx_requested} are requested by mapped actuators. Data access error.")
+            return False
+        current_joint_qpos = self.data.qpos[self.mujoco_qpos_indices_for_actuators]
+
+        # Define a maximum joint velocity (radians per second) or a maximum position change per step.
+        max_joint_vel = np.deg2rad(100) # Max 100 degrees per second for joints
+        max_angle_change_per_step = max_joint_vel * self.model.opt.timestep
+        
+        # Calculate the desired change for this step
+        angle_diff = target_joint_poses - current_joint_qpos
+        
+        # Limit the angle change per step to ensure smooth motion and prevent instability
+        limited_angle_diff = np.clip(angle_diff, -max_angle_change_per_step, max_angle_change_per_step)
+        
+        # The new control target is the current position plus the limited change
+        new_control_target_q = current_joint_qpos + limited_angle_diff
+
+        # --- Joint Limit Check (Apply to the *new_control_target_q* before applying) ---
         for i, actuator_id in enumerate(self.mujoco_actuator_ids):
-            q_target_for_this_actuator = target_joint_poses[i]
-            self.logger.debug(f"q target for actuator {actuator_id} : {np.degrees(q_target_for_this_actuator):.4f} degrees")
+            q_target_for_this_actuator = new_control_target_q[i]
             
-            actuator_name = self.model.actuator(actuator_id).name
-            joint_name_from_actuator = actuator_name.replace("_ctrl", "")
-            mujoco_joint_id = self.model.joint(joint_name_from_actuator).id
-            
+            mujoco_joint_id = self.model.actuator_trnid[actuator_id, 0] # Get joint ID from actuator_trnid
+            if mujoco_joint_id == -1: continue # Should have been caught during mapping
+
             if self.model.jnt_limited[mujoco_joint_id]: 
                 lower_limit = self.model.jnt_range[mujoco_joint_id, 0]
                 upper_limit = self.model.jnt_range[mujoco_joint_id, 1]
-                self.logger.debug(f"lower limit: {np.degrees(lower_limit):.4f} degrees")
-                self.logger.debug(f"upper limit: {np.degrees(upper_limit):.4f} degrees")
-                buffer = 0.005 
+                buffer = 0.005 # radians
                 
+                # Check bounds before accessing qposadr
+                if self.model.joint(mujoco_joint_id).qposadr[0] >= len(self.data.qpos):
+                    self.logger.error(f"MuJoCo qpos index out of bounds for joint '{self.model.joint(mujoco_joint_id).name}'.")
+                    return False
+                current_q_val = self.data.qpos[self.model.joint(mujoco_joint_id).qposadr[0]] # Actual current qpos
+
                 if not (lower_limit + buffer <= q_target_for_this_actuator <= upper_limit - buffer):
                     self.logger.warning(f"Joint limit violation detected for MuJoCo joint '{self.model.joint(mujoco_joint_id).name}' (controlled by actuator '{self.model.actuator(actuator_id).name}'):")
-                    self.logger.warning(f"  Target angle: {np.degrees(q_target_for_this_actuator):.2f}°")
+                    self.logger.warning(f"  Target angle (limited and buffered): {np.degrees(q_target_for_this_actuator):.2f}°")
+                    self.logger.warning(f"  Current angle: {np.degrees(current_q_val):.2f}°")
                     self.logger.warning(f"  Allowed limits (with buffer): [{np.degrees(lower_limit + buffer):.2f}°, {np.degrees(upper_limit - buffer):.2f}°]")
                     self.logger.warning(f"  Original limits: [{np.degrees(lower_limit):.2f}°, {np.degrees(upper_limit):.2f}°]")
                     return False  
 
-        self.data.ctrl[self.mujoco_actuator_ids] = target_joint_poses
-        self.logger.debug(f"MuJoCo data.ctrl after assignment: {self.data.ctrl}")
+        # Apply the smoothed target to the MuJoCo actuators
+        # Ensure new_control_target_q has the same size as mujoco_actuator_ids
+        if len(new_control_target_q) != len(self.mujoco_actuator_ids):
+            self.logger.error("Mismatch in size between new_control_target_q and mujoco_actuator_ids. Control cannot be applied.")
+            return False
+            
+        self.data.ctrl[self.mujoco_actuator_ids] = new_control_target_q
+        self.logger.debug(f"MuJoCo data.ctrl after assignment: {np.degrees(self.data.ctrl[self.mujoco_actuator_ids])}")
+        
         mj.mj_step(self.model, self.data)
         
         if self.viewer.is_running():
@@ -292,9 +407,14 @@ class MuJoCoRobot:
     def pose(self):
         """
         Gets the current end-effector pose from the MuJoCo simulation.
+        Uses the identified end-effector body or site.
         """
-        pos = self.data.site_xpos[self.eef_site_id]
-        rot_mat = self.data.site_xmat[self.eef_site_id].reshape(3, 3)
+        if self.eef_id_type == 'site':
+            pos = self.data.site_xpos[self.eef_id]
+            rot_mat = self.data.site_xmat[self.eef_id].reshape(3, 3)
+        else: # Must be 'body'
+            pos = self.data.xpos[self.eef_id]
+            rot_mat = self.data.xmat[self.eef_id].reshape(3, 3)
         return t3d.affines.compose(pos, rot_mat, [1, 1, 1])
 
     def get_observation(self, camera_name: str = "front_camera"):
@@ -353,37 +473,67 @@ class MuJoCoRobot:
         if self.viewer and self.viewer.is_running():
             self.logger.debug("Closing MuJoCo viewer.")
             self.viewer.close()
-        if hasattr(self, 'mjr_context') and self.mjr_context:
+            self.viewer = None # Mark as closed
+        if hasattr(self, 'mjr_context') and self.mjr_context and self._offscreen_initialized:
             try:
                 self.logger.debug("Freeing MuJoCo rendering context.")
                 mj.mjr_freeContext(self.mjr_context)
+                self.mjr_context = None # Mark as freed
+                self._offscreen_initialized = False
             except Exception as e:
                 self.logger.warning(f"Failed to free MjrContext: {e}", exc_info=True)
 
 if __name__ == "__main__":
-    # os.environ['MUJOCO_GL'] = 'osmesa' # Keep commented out if you want to see the viewer window
+    #os.environ['MUJOCO_GL'] = 'osmesa' # Uncomment this if running headless (without a display server)
     
     # --- Configuration ---
-    mjcf_file = Path("/home/nikola/code/alignit/alignit/lite6mjcf.xml")
+    mjcf_file = Path("/home/nikola/code/alignit/alignit/mujoco_menagerie/ufactory_lite6/scene.xml")
     urdf_file_pinocchio = Path("/home/nikola/code/alignit/alignit/lite6.urdf")
-    end_effector_link_name = "link6" 
+    end_effector_link_name = "link6" # This should match the end-effector body/frame name in your URDF/MJCF
 
-    main_logger.info("=== Initializing Robot Simulation ===")
+    main_logger.info("=== Initializing Robot Simulation for Scene Visualization ===")
     sim = None
     try:
-        main_logger.info("Loading MJCF and URDF models...")
+        main_logger.info(f"Loading MJCF from: {mjcf_file} and URDF from: {urdf_file_pinocchio}...")
         sim = MuJoCoRobot(mjcf_file, urdf_file_pinocchio, end_effector_link_name) 
         
-        # Capture the initial state of the robot at the start of the entire simulation
-        initial_simulation_pose = sim.pose()
-        initial_simulation_pos = initial_simulation_pose[:3, 3].copy()
-        initial_simulation_rot = initial_simulation_pose[:3, :3]
-        main_logger.info(f"\nInitial End-Effector Position (World Frame): {initial_simulation_pos}")
+        main_logger.info(f"MuJoCo model nq (generalized coordinates): {sim.model.nq}")
+        main_logger.info(f"MuJoCo model nv (degrees of freedom): {sim.model.nv}")
+        main_logger.info(f"MuJoCo model nu (actuators): {sim.model.nu}")
+        
+        # Log all MuJoCo joint names and their qpos addresses to help diagnose
+        main_logger.info("\n--- MuJoCo Joint Details ---")
+        for i in range(sim.model.njnt):
+            joint_name = sim.model.joint(i).name
+            # FIX: Access scalar type explicitly to avoid DeprecationWarning
+            joint_type = mj.mjtJoint(sim.model.joint(i).type.item()).name 
+            qpos_adr = sim.model.joint(i).qposadr[0] if sim.model.joint(i).type != mj.mjtJoint.mjJNT_FREE else -1
+            main_logger.info(f"- Joint: '{joint_name}' (ID: {i}), Type: {joint_type}, Qpos Address: {qpos_adr}")
+
+        # Log all MuJoCo actuator names and the joint they control
+        main_logger.info("\n--- MuJoCo Actuator Details ---")
+        for i in range(sim.model.nu):
+            actuator_name = sim.model.actuator(i).name
+            joint_id = sim.model.actuator_trnid[i, 0] # Use actuator_trnid here too for consistency in logging
+            joint_name = sim.model.joint(joint_id).name if joint_id != -1 else "N/A (not controlling a joint)"
+            main_logger.info(f"- Actuator: '{actuator_name}' (ID: {i}), Controls Joint: '{joint_name}'")
+
+        # Pinocchio joint details are now logged within the MuJoCoRobot class init for better context
+        # main_logger.info("\n--- Pinocchio Joint Details ---")
+        # for joint_id in range(1, sim.robot_pin.model.njoints): # Skip universe joint (id 0)
+        #     joint_name = sim.robot_pin.model.names[joint_id]
+        #     main_logger.info(f"- Joint: '{joint_name}' (ID: {joint_id}), Q Index: {sim.robot_pin.model.joints[joint_id].idx_q}")
+
+        main_logger.info(f"\nInitial End-Effector Position (World Frame): {sim.pose()[:3, 3]}")
         main_logger.info(f"Initial Joint Angles (MuJoCo qpos, degrees): {np.degrees(sim.data.qpos)}")
         
+        main_logger.info("\nViewer opened. It will remain open until you close the window manually.")
+        main_logger.info("Check the log file for detailed model information if the viewer closes immediately.")
+
         # --- Motion Parameters ---
         distance = 0.1  # 10 cm movement in the X direction
         duration = 5.0  # seconds for one direction (e.g., 5s to move forward)
+        # Calculate steps based on desired duration and MuJoCo's timestep
         steps = int(duration / sim.model.opt.timestep) 
         
         main_logger.info(f"\nMotion Parameters:")
@@ -391,8 +541,14 @@ if __name__ == "__main__":
         main_logger.info(f"- Duration per direction: {duration}s")
         main_logger.info(f"- Total simulation steps per direction: {steps}")
         main_logger.info(f"- Simulation Timestep: {sim.model.opt.timestep}s")
+
+        # Capture the initial state of the robot at the start of the entire simulation
+        initial_simulation_pose = sim.pose()
+        initial_simulation_pos = initial_simulation_pose[:3, 3].copy()
+        initial_simulation_rot = initial_simulation_pose[:3, :3]
         
         # --- Main Simulation Loop: Move Forward and Backward ---
+        # Outer loop for cycles, inner loop for forward/backward movement
         for cycle in range(2): 
             for direction_sign in [1, -1]: # 1 for forward, -1 for backward
                 dir_name = "forward" if direction_sign > 0 else "backward"
@@ -411,6 +567,10 @@ if __name__ == "__main__":
                 target_x_values_for_phase = np.linspace(start_x_value, end_x_value, steps + 1)
                 
                 for t_step in range(steps):
+                    if not sim.viewer.is_running(): # Check if viewer is still open
+                        main_logger.info("Viewer window closed by user. Stopping simulation.")
+                        break 
+
                     # The target position for this step is taken from the pre-calculated array.
                     # t_step + 1 because t_step is 0-indexed, and we want to move towards the next point in trajectory.
                     target_pos = initial_simulation_pos.copy() # Keep Y and Z from the original start
@@ -430,29 +590,26 @@ if __name__ == "__main__":
                     
                     current_pose = sim.pose()
                     current_pos = current_pose[:3, 3]
-                    current_joints = np.degrees(sim.data.qpos)
+                    current_joints = np.degrees(sim.data.qpos[sim.mujoco_qpos_indices_for_actuators]) # Only show actuated joints
                     
                     main_logger.info(f"  Current Robot State (after step):")
                     main_logger.info(f"  - Actual End-Effector X position (World Frame): {current_pos[0]:.4f}m")
-                    main_logger.info(f"  - Joint angles (MuJoCo qpos, degrees): {current_joints}")
+                    main_logger.info(f"  - Joint angles (MuJoCo qpos, degrees, actuated only): {current_joints}")
                     
                     if not success:
                         main_logger.error("\n!!! Movement failed due to joint limits or other issues. Stopping simulation. !!!")
                         main_logger.info("\n  Detailed Joint Limit Status (MuJoCo Joints):")
-                        for j in range(sim.model.nq): 
-                            if sim.model.jnt_limited[j]: 
-                                limit_min = np.degrees(sim.model.jnt_range[j,0])
-                                limit_max = np.degrees(sim.model.jnt_range[j,1])
-                                current = current_joints[j]
+                        for j_idx, mujoco_qpos_idx in enumerate(sim.mujoco_qpos_indices_for_actuators): 
+                            mujoco_joint_id = sim.model.actuator_trnid[sim.mujoco_actuator_ids[j_idx], 0]
+                            if mujoco_joint_id != -1 and sim.model.jnt_limited[mujoco_joint_id]: 
+                                limit_min = np.degrees(sim.model.jnt_range[mujoco_joint_id,0])
+                                limit_max = np.degrees(sim.model.jnt_range[mujoco_joint_id,1])
+                                current = np.degrees(sim.data.qpos[mujoco_qpos_idx])
                                 status = "OK" if limit_min <= current <= limit_max else "VIOLATION!"
-                                main_logger.info(f"    Joint '{sim.model.joint(j).name}' (ID: {j}): {current:.2f}° (Limits: {limit_min:.2f} to {limit_max:.2f}°) - {status}")
+                                main_logger.info(f"    Joint '{sim.model.joint(mujoco_joint_id).name}' (ID: {mujoco_joint_id}): {current:.2f}° (Limits: {limit_min:.2f} to {limit_max:.2f}°) - {status}")
                         break 
                     
-                    if not sim.viewer.is_running():
-                        main_logger.info("Viewer window closed by user. Stopping simulation.")
-                        break 
-                    
-                    time.sleep(sim.model.opt.timestep)
+                    time.sleep(sim.model.opt.timestep) # Sleep for simulation timestep to control real-time speed
                 
                 if not success or not sim.viewer.is_running():
                     break 
