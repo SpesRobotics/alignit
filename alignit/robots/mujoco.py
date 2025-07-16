@@ -4,12 +4,19 @@ import numpy as np
 import transforms3d as t3d
 import time
 from pathlib import Path
+import os
 import logging
+import pinocchio as pin
+from PIL import Image  
 from teleop.utils.jacobi_robot import JacobiRobot
-from alignit.robots.robot import Robot
 
+GLOBAL_GL_CONTEXT_WIDTH = 320
+GLOBAL_GL_CONTEXT_HEIGHT = 240
+_mujoco_gl_context_initialized = True
+mj.GL_RENDER = mj.GLContext(max_width=GLOBAL_GL_CONTEXT_WIDTH, max_height=GLOBAL_GL_CONTEXT_HEIGHT)
+mj.GL_RENDER.make_current()
 
-class MuJoCoRobot(Robot):
+class MuJoCoRobot:
     def __init__(self):
         """
         Initializes the MuJoCo simulation environment and the JacobiRobot model.
@@ -116,8 +123,6 @@ class MuJoCoRobot(Robot):
             mj.mj_step(self.model, self.data)
             self.data.ctrl[:] = 0
 
-
-
     def send_action(self, target_pose_matrix):
         """
         Sends a target end-effector pose to the robot.
@@ -168,109 +173,147 @@ class MuJoCoRobot(Robot):
             rot_mat = self.data.xmat[self.eef_id].reshape(3, 3)
         return t3d.affines.compose(pos, rot_mat, [1, 1, 1])
 
-    def get_observation(self, camera_name: str = "front_camera"):
-        """Gets the current observation from the simulation."""
-        if self.viewer.is_running():
-            return {
-                "qpos": self.data.qpos.copy(),
-                "qvel": self.data.qvel.copy(),
-                "eef_pose": self.pose()
-            }
-            
-        self._offscreen_initialized = False 
-        self._initialize_offscreen_rendering()
-        if not self._offscreen_initialized:
-            return {
-                "qpos": self.data.qpos.copy(),
-                "qvel": self.data.qvel.copy(),
-                "eef_pose": self.pose()
-            }
-            
+    def _initialize_offscreen_rendering(self):
+        """
+        Initializes the offscreen rendering context for capturing images.
+        This method sets up the necessary MuJoCo rendering components.
+        It should ideally be called once successfully.
+        """
+        global _mujoco_gl_context_initialized
+
         try:
+            self.scn = mj.MjvScene(self.model, maxgeom=1000)
+            self.cam = mj.MjvCamera()
+            self.vopt = mj.MjvOption()
+            self.pert = mj.MjvPerturb()
+
+            mj.mjv_defaultCamera(self.cam)
+            mj.mjv_defaultOption(self.vopt)
+
+            self.mjr_context = mj.MjrContext(self.model, 100)  # 100 for font scale
+
+            self._offscreen_initialized = True
+        except Exception as e:
+            self._offscreen_initialized = False
+            self.mjr_context = None # Ensure context is reset on failure
+
+    def get_observation(self, camera_name: str = "front_camera"):
+        """
+        Gets the current observation from the simulation, including camera RGB data if offscreen rendering is active.
+
+        Args:
+            camera_name (str): The name of the camera to use for observation. Defaults to "front_camera".
+
+        Returns:
+            dict: A dictionary containing 'qpos', 'qvel', 'eef_pose', and optionally 'camera.rgb'.
+        """
+        global _mujoco_gl_context_initialized
+
+        if not self._offscreen_initialized:
+            self._initialize_offscreen_rendering()
+          
+        try:
+            mj.mjv_updateScene(self.model, self.data, self.vopt, self.pert, self.cam, mj.mjtCatBit.mjCAT_ALL, self.scn)
+
             if camera_name in [self.model.camera(i).name for i in range(self.model.ncam)]:
                 self.cam.type = mj.mjtCamera.mjCAMERA_FIXED
                 self.cam.fixedcamid = self.model.camera(camera_name).id
+                self.logger.debug(f"Using fixed camera: {camera_name}")
             else:
                 self.cam.type = mj.mjtCamera.mjCAMERA_FREE
-                mj.mjv_defaultCamera(self.cam)
-                
-            rgb_data = np.zeros((240, 320, 3), dtype=np.uint8) 
-            depth_data = np.zeros((240, 320), dtype=np.float32) 
-            viewport = mj.MjrRect(0, 0, 320, 240) 
+                mj.mjv_defaultCamera(self.cam)  # Reset to default if the named camera is not found
+                self.logger.debug("Using free camera (default).")
+
+            width, height = 320, 240
+            viewport = mj.MjrRect(0, 0, width, height)
+
+            rgb_data = np.zeros((height, width, 3), dtype=np.uint8)
+            depth_data = np.zeros((height, width), dtype=np.float32)
+
             mj.mjr_render(viewport, self.scn, self.mjr_context)
+
             mj.mjr_readPixels(rgb_data, depth_data, viewport, self.mjr_context)
-            
+
             return {
                 "qpos": self.data.qpos.copy(),
                 "qvel": self.data.qvel.copy(),
                 "eef_pose": self.pose(),
-                "camera.rgb": np.flipud(rgb_data) 
+                "camera.rgb": np.flipud(rgb_data)
             }
-        except Exception as e:
-            self.logger.warning(f"Camera rendering failed: {e}", exc_info=True)
-            return {
-                "qpos": self.data.qpos.copy(),
-                "qvel": self.data.qvel.copy(),
-                "eef_pose": self.pose()
-            }
+        except Exception:
+            return False
 
     def close(self):
-        self.logger.debug("Closing MuJoCo viewer.")
-        self.viewer.close()
-        self.viewer = None
-        if hasattr(self, 'mjr_context') and self.mjr_context and self._offscreen_initialized:
+        """
+        Closes the MuJoCo viewer (if active) and frees the offscreen rendering context.
+        """
+        self.logger.debug("Closing MuJoCo resources.")
+        if self.viewer:
+            self.logger.debug("Closing MuJoCo viewer.")
+            self.viewer.close()
+            self.viewer = None
+        if self.mjr_context and self._offscreen_initialized:
             try:
-                self.logger.debug("Freeing MuJoCo rendering context.")
-                mj.mjr_freeContext(self.mjr_context)
                 self.mjr_context = None
                 self._offscreen_initialized = False
             except Exception as e:
-                self.logger.warning(f"Failed to free MjrContext: {e}", exc_info=True)
-
+                quit
+        global _mujoco_gl_context_initialized
+        if _mujoco_gl_context_initialized:
+            try:
+                _mujoco_gl_context_initialized = False 
+            except Exception as e:
+                quit
 if __name__ == "__main__":
-   
+
     sim = None
+    output_dir = "captured_images"
+    os.makedirs(output_dir, exist_ok=True)
+    print(f"Images will be saved to: {os.path.abspath(output_dir)}")
+
     try:
         sim = MuJoCoRobot()
-
         initial_pose = sim.pose()
         initial_pos = initial_pose[:3, 3].copy()
         initial_rot = initial_pose[:3, :3].copy()
 
-        target_pos = initial_pos + np.array([0.1, 0.0, 0.0]) # Move 10cm in positive X
-        target_rot = initial_rot # Keep initial orientation
+        target_pos = initial_pos + np.array([0.1, 0.0, 0.0])
+        target_rot = initial_rot
         target_pose_matrix = t3d.affines.compose(target_pos, target_rot, [1, 1, 1])
 
-
-        duration_s = 3.0 # seconds
+        duration_s = 3.0  
         steps_to_simulate = int(duration_s / sim.model.opt.timestep)
-        
+
         for i in range(steps_to_simulate):
-            success = sim.send_action(target_pose_matrix) # Continuously send the same target
+            success = sim.send_action(target_pose_matrix)
 
-            if (i % 100 == 0) or (i == steps_to_simulate - 1):
-                current_pose = sim.pose()
-                current_pos = current_pose[:3, 3]
-                pos_error = np.linalg.norm(current_pos - target_pos)
-
+            if success:
+                # Capture and save an image periodically (e.g., every 50 steps) or at the end
+                if (i % 50 == 0) or (i == steps_to_simulate - 1):
+                    observation = sim.get_observation(camera_name="front_camera")
+                    if "camera.rgb" in observation and observation["camera.rgb"] is not None:
+                        rgb_image = Image.fromarray(observation["camera.rgb"])
+                        image_filename = os.path.join(output_dir, f"frame_{i:05d}.png")
+                        rgb_image.save(image_filename)
+                    else:
+                        quit
 
         final_pose = sim.pose()
         final_pos = final_pose[:3, 3]
         final_rot = final_pose[:3, :3]
 
         position_error = np.linalg.norm(final_pos - target_pos)
-       
-        tolerance = 0.002 # meters (0.5 cm)
+        tolerance = 0.002 
 
         if position_error <= tolerance:
-            print(f"Robot has arrived to a desired pose with a tolerance of {position_error*1000} mm")
+            print(f"Robot has arrived to a desired pose with a tolerance of {position_error*1000:.2f} mm")
         else:
-            print(f"Robot did not arrive at a desired position,position error ({position_error} > tolerance error ({tolerance}))")
+            print(f"Robot did not arrive at a desired position, position error ({position_error:.4f} m) > tolerance error ({tolerance} m)")
+
     except Exception as e:
-        print(f"\n!!! An unexpected exception occurred: {str(e)}", exc_info=True)
+        quit
     finally:
         if sim:
             print("\nClosing simulation resources...")
-            time.sleep(5)
             sim.close()
     print("Simulation finished.")
