@@ -7,7 +7,7 @@ import pinocchio as pin
 from pathlib import Path
 import os
 import logging
-
+from teleop.ik import IKProblem, IKSolver
 # --- Configure the root logger once at the top ---
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(levelname)s - %(name)s - %(message)s',
@@ -216,70 +216,79 @@ class MuJoCoRobot:
         except Exception as e:
             self.logger.warning(f"Failed offscreen rendering initialization: {e}", exc_info=True)
 
-    def _calculate_ik_pinocchio(self, target_pose_matrix):
+    def _calculate_ik_pinocchio(self, target_pose_matrix, max_joint_speed=None, max_joint_accel=None, joint_bias=None):
         """
-        Calculates the Inverse Kinematics (IK) solution using Pinocchio.
-        Finds the joint configuration (q) that places the end-effector at the target_pose_matrix.
-
+        Enhanced IK solver with speed/acceleration limits and joint bias.
+        
         Args:
-            target_pose_matrix (np.ndarray): A 4x4 homogeneous transformation matrix
-                                             representing the target pose of the end-effector
-                                             relative to the robot's base frame.
-
-        Returns:
-            np.ndarray: The full Pinocchio configuration vector (q) for the robot.
+            target_pose_matrix: 4x4 target pose matrix
+            max_joint_speed: Maximum joint velocity (rad/s) 
+            max_joint_accel: Maximum joint acceleration (rad/s²)
+            joint_bias: Bias weights for joint preferences [0-1]
         """
-        if not self.mujoco_actuator_ids: # If no actuators mapped, IK cannot work
-            self.logger.error("IK cannot be calculated: No MuJoCo actuators mapped to Pinocchio joints.")
-            return self.current_q_pin # Return current Pinocchio pose
+        if not self.mujoco_actuator_ids:
+            self.logger.error("IK cannot be calculated: No actuators mapped")
+            return self.current_q_pin
 
+        # Convert target to SE3
         target_se3 = pin.SE3(target_pose_matrix[:3, :3], target_pose_matrix[:3, 3])
-        q = self.current_q_pin.copy()  
         
-        eps = 1e-4   
-        IT_MAX = 10000 # Increased iterations for better convergence
-        DT = 0.01     # Reduced IK step size for smoother trajectory
-        damp = 1e-2  # Increased damping for better stability
+        # Initialize solver with teleop's IKProblem
+        problem = pin.IKProblem(
+            model=self.robot_pin.model,
+            data=self.robot_pin.data,
+            frame_id=self.end_effector_frame_id_pin,
+            target_pose=target_se3,
+            q_init=self.current_q_pin
+        )
+
+        # Configure solver with Levenberg-Marquardt for robustness
+        solver = pin.IKSolver(
+            problem=problem,
+            method='LevenbergMarquardt',
+            max_iter=100,
+            dt=0.1,
+            damping=1e-6
+        )
+
+        # 1. Joint Limit Constraints
+        lb = self.robot_pin.model.lowerPositionLimit
+        ub = self.robot_pin.model.upperPositionLimit
+        solver.add_joint_limits(lb, ub)
+
+        # 2. Joint Velocity Limits
+        if max_joint_speed is not None:
+            current_vel = self.data.qvel[self.mujoco_qpos_indices_for_actuators]
+            vel_limits = np.full_like(lb, max_joint_speed)
+            solver.add_velocity_limits(current_vel, vel_limits, self.model.opt.timestep)
+
+        # 3. Joint Acceleration Limits
+        if max_joint_accel is not None:
+            current_accel = self.data.qacc[self.mujoco_qpos_indices_for_actuators]
+            accel_limits = np.full_like(lb, max_joint_accel)
+            solver.add_acceleration_limits(current_accel, accel_limits, self.model.opt.timestep**2)
+
+        # 4. Joint Bias (Preference for certain joint configurations)
+        if joint_bias is not None:
+            neutral_pos = pin.neutral(self.robot_pin.model)
+            bias_task = {
+                'type': 'posture',
+                'target': neutral_pos,
+                'weights': joint_bias  # Higher weight = stronger preference
+            }
+            solver.add_nullspace_task(bias_task)
+
+        # Solve IK
+        result = solver.solve()
         
-        self.logger.debug("\nStarting IK calculation with Pinocchio...")
-        for i in range(IT_MAX):
-            pin.forwardKinematics(self.robot_pin.model, self.robot_pin.data, q)
-            pin.updateFramePlacements(self.robot_pin.model, self.robot_pin.data)
-            
-            current_se3 = self.robot_pin.data.oMf[self.end_effector_frame_id_pin]
-            err = pin.log6(current_se3.inverse() * target_se3).vector 
-            
-            error_norm = np.linalg.norm(err)
-            self.logger.debug(f"  IK Iteration {i}: Error norm = {error_norm:.6f}") # Uncommented for detailed IK per-iteration debug
+        if not result.success:
+            self.logger.warning(f"IK reached error {result.error:.6f} after {result.iterations} iterations")
 
-            if error_norm < eps:
-                self.logger.debug(f"IK converged in {i} iterations. Final error norm: {error_norm:.6f}")
-                break
-
-            J = pin.computeFrameJacobian(
-                self.robot_pin.model, self.robot_pin.data, q,
-                self.end_effector_frame_id_pin, # Ensure this uses the correct frame ID
-                pin.ReferenceFrame.LOCAL
-            )
-            
-            U, S, Vh = np.linalg.svd(J)
-            S_inv = np.zeros(J.shape[1])
-            S_inv[:len(S)] = S / (S**2 + damp) 
-            dq = Vh.T @ np.diag(S_inv) @ U.T @ err
-
-            q_neutral = pin.neutral(self.robot_pin.model)
-            nullspace_projection = (np.eye(J.shape[1]) - np.linalg.pinv(J) @ J) @ (q - q_neutral)
-            dq += 0.01 * nullspace_projection 
-            
-            q = pin.integrate(self.robot_pin.model, q, dq * DT) 
-            
-            q = np.clip(q, self.robot_pin.model.lowerPositionLimit, self.robot_pin.model.upperPositionLimit)
-
-        if np.linalg.norm(err) >= eps:
-            self.logger.warning(f"IK did not fully converge after {IT_MAX} iterations. Final error norm: {np.linalg.norm(err):.6f}")
+        # Apply safety clipping
+        q = np.clip(result.q, lb, ub)
+        self.current_q_pin = q.copy()
         
-        self.current_q_pin = q.copy() 
-        return q 
+        return q
 
     def send_action(self, action_pose_matrix):
         """
@@ -487,7 +496,7 @@ if __name__ == "__main__":
     #os.environ['MUJOCO_GL'] = 'osmesa' # Uncomment this if running headless (without a display server)
     
     # --- Configuration ---
-    mjcf_file = Path("/home/nikola/code/alignit/alignit/mujoco_menagerie/ufactory_lite6/scene.xml")
+    mjcf_file = Path("mujoco_menagerie/ufactory_lite6/scene.xml")
     urdf_file_pinocchio = Path("/home/nikola/code/alignit/alignit/lite6.urdf")
     end_effector_link_name = "link6" # This should match the end-effector body/frame name in your URDF/MJCF
 
@@ -509,7 +518,6 @@ if __name__ == "__main__":
             joint_type = mj.mjtJoint(sim.model.joint(i).type.item()).name 
             qpos_adr = sim.model.joint(i).qposadr[0] if sim.model.joint(i).type != mj.mjtJoint.mjJNT_FREE else -1
             main_logger.info(f"- Joint: '{joint_name}' (ID: {i}), Type: {joint_type}, Qpos Address: {qpos_adr}")
-
         # Log all MuJoCo actuator names and the joint they control
         main_logger.info("\n--- MuJoCo Actuator Details ---")
         for i in range(sim.model.nu):
