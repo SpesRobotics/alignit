@@ -2,6 +2,7 @@ import time
 import numpy as np
 import transforms3d as t3d
 from alignit.robots.bullet import Bullet
+from alignit.robots.mujoco import MuJoCoRobot
 from alignit.utils.tfs import are_tfs_close
 from datasets import Dataset, Features, Sequence, Value, Image, load_from_disk, concatenate_datasets
 from alignit.utils.zhou import se3_sixd
@@ -71,7 +72,7 @@ def generate_spiral_trajectory(
     return trajectory
 
 def main():
-    robot = Bullet()
+    robot = MuJoCoRobot()
     features = Features({
         "images": Sequence(Image()),
         "action": Sequence(Value("float32"))

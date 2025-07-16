@@ -4,16 +4,12 @@ import numpy as np
 import transforms3d as t3d
 import time
 from pathlib import Path
-import os
 import logging
-import pinocchio as pin
-
-
-# Import JacobiRobot
 from teleop.utils.jacobi_robot import JacobiRobot
+from alignit.robots.robot import Robot
 
 
-class MuJoCoRobot:
+class MuJoCoRobot(Robot):
     def __init__(self):
         """
         Initializes the MuJoCo simulation environment and the JacobiRobot model.
