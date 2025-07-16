@@ -9,6 +9,7 @@ import logging
 import pinocchio as pin
 from PIL import Image  
 from teleop.utils.jacobi_robot import JacobiRobot
+from alignit.robots.robot import Robot
 
 GLOBAL_GL_CONTEXT_WIDTH = 320
 GLOBAL_GL_CONTEXT_HEIGHT = 240
@@ -16,7 +17,7 @@ _mujoco_gl_context_initialized = True
 mj.GL_RENDER = mj.GLContext(max_width=GLOBAL_GL_CONTEXT_WIDTH, max_height=GLOBAL_GL_CONTEXT_HEIGHT)
 mj.GL_RENDER.make_current()
 
-class MuJoCoRobot:
+class MuJoCoRobot(Robot ):
     def __init__(self):
         """
         Initializes the MuJoCo simulation environment and the JacobiRobot model.
@@ -31,13 +32,13 @@ class MuJoCoRobot:
             self.model = mj.MjModel.from_xml_path(str(mjcf_path))
             self.data = mj.MjData(self.model)
 
-            self.model.opt.timestep = 0.005 
+            self.model.opt.timestep = 0.005
             self.model.opt.iterations = 50
             self.model.opt.tolerance = 1e-8
             self.model.opt.solver = mj.mjtSolver.mjSOL_NEWTON
 
             for i in range(self.model.nv):
-                self.model.dof_damping[i] = 0.5 
+                self.model.dof_damping[i] = 0.5
 
 
             # --- Identify End-Effector in MuJoCo ---
@@ -286,11 +287,11 @@ if __name__ == "__main__":
 
         for i in range(steps_to_simulate):
             success = sim.send_action(target_pose_matrix)
-
+            print(f"Current robot pose: {sim.pose()}")
             if success:
                 # Capture and save an image periodically (e.g., every 50 steps) or at the end
                 if (i % 50 == 0) or (i == steps_to_simulate - 1):
-                    observation = sim.get_observation(camera_name="front_camera")
+                    observation = sim.get_observation(camera_name="gripper_camera")
                     if "camera.rgb" in observation and observation["camera.rgb"] is not None:
                         rgb_image = Image.fromarray(observation["camera.rgb"])
                         image_filename = os.path.join(output_dir, f"frame_{i:05d}.png")

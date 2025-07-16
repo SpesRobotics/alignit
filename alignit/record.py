@@ -6,6 +6,7 @@ from alignit.robots.mujoco import MuJoCoRobot
 from alignit.utils.tfs import are_tfs_close
 from datasets import Dataset, Features, Sequence, Value, Image, load_from_disk, concatenate_datasets
 from alignit.utils.zhou import se3_sixd
+from alignit.robots.robot import Robot
 import shutil
 import os
 def generate_spiral_trajectory(
@@ -80,15 +81,15 @@ def main():
 
     # Setup target poses
     pose_final_target = t3d.affines.compose(
-        [0.5, 0.1, 0.18], t3d.euler.euler2mat(np.pi, 0, 0), [1, 1, 1]
+        [0.180, 0, 0.152], t3d.euler.euler2mat(np.pi, 0, 0), [1, 1, 1]
     )
     pose_alignment_target = pose_final_target @ t3d.affines.compose(
-        [0, 0, -0.15], t3d.euler.euler2mat(0, 0, 0), [1, 1, 1]
+        [0., 0, -0.15], t3d.euler.euler2mat(0, 0, 0), [1, 1, 1]
     )
     pose_record_start = pose_alignment_target @ t3d.affines.compose(
         [0, 0, 0.05], t3d.euler.euler2mat(0, 0, 0), [1, 1, 1]
     )
-
+    print("Current robot pose: ")
     # Move to initial position
     robot.servo_to_pose(pose_final_target)
 
