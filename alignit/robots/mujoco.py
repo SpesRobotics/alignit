@@ -10,6 +10,7 @@ import pinocchio as pin
 from PIL import Image  
 from teleop.utils.jacobi_robot import JacobiRobot
 from alignit.robots.robot import Robot
+import threading
 
 GLOBAL_GL_CONTEXT_WIDTH = 320
 GLOBAL_GL_CONTEXT_HEIGHT = 240
@@ -17,7 +18,7 @@ _mujoco_gl_context_initialized = True
 mj.GL_RENDER = mj.GLContext(max_width=GLOBAL_GL_CONTEXT_WIDTH, max_height=GLOBAL_GL_CONTEXT_HEIGHT)
 mj.GL_RENDER.make_current()
 
-class MuJoCoRobot(Robot ):
+class MuJoCoRobot(Robot):
     def __init__(self):
         """
         Initializes the MuJoCo simulation environment and the JacobiRobot model.
@@ -40,19 +41,15 @@ class MuJoCoRobot(Robot ):
             for i in range(self.model.nv):
                 self.model.dof_damping[i] = 0.5
 
-
             # --- Identify End-Effector in MuJoCo ---
             try:
                 self.eef_id_type = 'site'
                 self.eef_id = self.model.site("gripper_site").id
-                self.logger.info("Using 'gripper_site' as MuJoCo end-effector.")
             except KeyError:
                 try:
                     self.eef_id_type = 'body'
                     self.eef_id = self.model.body("link6").id
-                    self.logger.info("Using 'link6' body as MuJoCo end-effector.")
                 except KeyError:
-                    self.logger.critical("Neither 'gripper_site' nor 'link6' body found in MuJoCo model for end-effector.")
                     raise RuntimeError("MuJoCo end-effector not found.")
 
         except Exception as e:
@@ -70,9 +67,7 @@ class MuJoCoRobot(Robot ):
 
         try:
             self.robot_jacobi = JacobiRobot(str(urdf_path_jacobi), ee_link=end_effector_frame_name_jacobi)
-            self.logger.info(f"JacobiRobot model loaded from: {urdf_path_jacobi}")
         except Exception as e:
-            self.logger.critical(f"Failed to initialize JacobiRobot: {e}", exc_info=True)
             raise RuntimeError(f"Failed to initialize JacobiRobot: {e}")
 
         jacobi_neutral_q = self.robot_jacobi.q.copy()
@@ -81,27 +76,31 @@ class MuJoCoRobot(Robot ):
         self.mujoco_actuator_ids = []
         self.mujoco_actuator_to_jacobi_joint_idx = []
         self.mujoco_qpos_indices_for_actuators = []
+        self.gripper_ctrl_id = None
 
         jacobi_joint_name_to_idx_map = {}
-        jacobi_joint_names = self.robot_jacobi.get_joint_names() # Call the method!
-        self.logger.info("\nJacobiRobot Joint Names and their indices:")
+        jacobi_joint_names = self.robot_jacobi.get_joint_names()
         for joint_idx, joint_name in enumerate(jacobi_joint_names):
             jacobi_joint_name_to_idx_map[joint_name] = joint_idx
-
 
         for i in range(self.model.nu):
             actuator_name = self.model.actuator(i).name
             mujoco_joint_id = self.model.actuator_trnid[i, 0]
-
             mujoco_joint_name = self.model.joint(mujoco_joint_id).name
+
+            # Special handling for gripper actuator
+            if actuator_name == "gripper":
+                self.gripper_ctrl_id = i
+                self.logger.info(f"Found gripper actuator at index {i}")
+                continue  # Skip adding to Jacobi mapping
 
             if mujoco_joint_name in jacobi_joint_name_to_idx_map:
                 self.mujoco_actuator_ids.append(self.model.actuator(i).id)
                 self.mujoco_actuator_to_jacobi_joint_idx.append(jacobi_joint_name_to_idx_map[mujoco_joint_name])
                 self.mujoco_qpos_indices_for_actuators.append(self.model.joint(mujoco_joint_id).qposadr[0])
             else:
-                self.logger.warning(f"    WARNING: MuJoCo joint '{mujoco_joint_name}' (controlled by actuator '{actuator_name}' at index {i}) DOES NOT have a corresponding JacobiRobot joint with the same name. Skipping this actuator.")
-       
+                self.logger.warning(f"MuJoCo joint '{mujoco_joint_name}' (actuator '{actuator_name}' at index {i}) has no JacobiRobot counterpart")
+
         mj.mj_resetData(self.model, self.data)
 
         if len(self.mujoco_qpos_indices_for_actuators) > 0:
@@ -115,57 +114,85 @@ class MuJoCoRobot(Robot ):
         else:
             self.logger.warning("No mapped joints. MuJoCo's initial pose might not match JacobiRobot's neutral pose.")
 
+        self.gripper_open_pos = 0.008
+        self.gripper_close_pos = -0.008
+        self.current_gripper_pos = 0.0
+
         mj.mj_forward(self.model, self.data)
         self.viewer.sync()
         time.sleep(1.0)
+        self._viewer_active = True
+        self._sync_thread = threading.Thread(target=self._sync_viewer_loop, daemon=True)
+        self._sync_thread.start()
 
-        # --- Warmup simulation ---
-        for _ in range(10):
+
+    def _sync_viewer_loop(self):
+        while self._viewer_active:
+            if self.viewer and self.viewer.is_running():
+                self.viewer.sync()
+            time.sleep(0.005)  # ~200Hz refresh
+
+    def gripper_close(self):
+        self._set_gripper_position(self.gripper_close_pos)
+        self.viewer.sync()
+
+    def gripper_open(self):
+        self._set_gripper_position(self.gripper_open_pos)
+        self.viewer.sync()
+
+    def gripper_off(self):
+            self._set_gripper_position(0.0)
+
+    def _set_gripper_position(self, pos):
+        target_pos = np.clip(pos, self.gripper_close_pos, self.gripper_open_pos)
+        steps = 20  # Number of steps for smooth movement
+        delta = (target_pos - self.current_gripper_pos) / steps
+        
+        for _ in range(steps):
+            self.current_gripper_pos += delta
+            self.data.ctrl[self.gripper_ctrl_id] = self.current_gripper_pos
             mj.mj_step(self.model, self.data)
-            self.data.ctrl[:] = 0
 
     def send_action(self, target_pose_matrix):
         """
         Sends a target end-effector pose to the robot.
         This function now drives JacobiRobot's internal state using its servo_to_pose,
         and then applies JacobiRobot's internal joint configuration to MuJoCo.
-
-        Args:
-            target_pose_matrix (np.ndarray): A 4x4 homogeneous transformation matrix
-                                             representing the target pose of the end-effector
-                                             relative to the world frame.
-
-        Returns:
-            bool: True if the action was successfully processed and simulation step taken, False otherwise.
         """
-        if not self.mujoco_actuator_ids:
-            self.logger.error("Cannot send action: No MuJoCo actuators mapped to JacobiRobot joints.")
-            return False
-
+    
         try:
             base_pos = self.data.xpos[self.model.body("link_base").id]
             base_rot = self.data.xmat[self.model.body("link_base").id].reshape(3,3)
             world_to_base = t3d.affines.compose(base_pos, base_rot, [1,1,1])
         except KeyError:
-            self.logger.error("Body 'link_base' not found in MuJoCo model. Assuming base at world origin (0,0,0, identity).")
             world_to_base = np.eye(4)
 
         base_target_pose = np.linalg.inv(world_to_base) @ target_pose_matrix
         servo_dt = self.model.opt.timestep   
         self.robot_jacobi.servo_to_pose(base_target_pose, dt=servo_dt)
 
-        full_jacobi_q = self.robot_jacobi.q # JacobiRobot's internal q state
+        full_jacobi_q = self.robot_jacobi.q
         target_joint_qpos_for_mujoco = np.array([full_jacobi_q[idx] for idx in self.mujoco_actuator_to_jacobi_joint_idx])    
         self.data.ctrl[self.mujoco_actuator_ids] = target_joint_qpos_for_mujoco
 
-        # Step the MuJoCo simulation
         mj.mj_step(self.model, self.data)
 
         self.viewer.sync()
-        return True 
+        return True
     
+    def get_object_pose(self, object_name="pickup_object"):
+        """Returns the 4x4 homogeneous transformation matrix of an object"""
+        try:
+            obj_id = self.model.body(object_name).id
+            
+            pos = self.data.body(obj_id).xpos
+            rot = self.data.body(obj_id).xmat.reshape(3, 3)
+            
+            return t3d.affines.compose(pos, rot, [1, 1, 1])
+        except Exception as e:
+            return None
+
     def pose(self):
-        """Gets the current end-effector pose from the MuJoCo simulation."""
         if self.eef_id_type == 'site':
             pos = self.data.site_xpos[self.eef_id]
             rot_mat = self.data.site_xmat[self.eef_id].reshape(3, 3)
@@ -175,11 +202,7 @@ class MuJoCoRobot(Robot ):
         return t3d.affines.compose(pos, rot_mat, [1, 1, 1])
 
     def _initialize_offscreen_rendering(self):
-        """
-        Initializes the offscreen rendering context for capturing images.
-        This method sets up the necessary MuJoCo rendering components.
-        It should ideally be called once successfully.
-        """
+        """Initializes the offscreen rendering context for capturing images."""
         global _mujoco_gl_context_initialized
 
         try:
@@ -191,23 +214,14 @@ class MuJoCoRobot(Robot ):
             mj.mjv_defaultCamera(self.cam)
             mj.mjv_defaultOption(self.vopt)
 
-            self.mjr_context = mj.MjrContext(self.model, 100)  # 100 for font scale
-
+            self.mjr_context = mj.MjrContext(self.model, 100)
             self._offscreen_initialized = True
         except Exception as e:
             self._offscreen_initialized = False
-            self.mjr_context = None # Ensure context is reset on failure
+            self.mjr_context = None
 
-    def get_observation(self, camera_name: str = "front_camera"):
-        """
-        Gets the current observation from the simulation, including camera RGB data if offscreen rendering is active.
-
-        Args:
-            camera_name (str): The name of the camera to use for observation. Defaults to "front_camera".
-
-        Returns:
-            dict: A dictionary containing 'qpos', 'qvel', 'eef_pose', and optionally 'camera.rgb'.
-        """
+    def get_observation(self, camera_name: str = "gripper_camera"):
+        """Gets the current observation from the simulation."""
         global _mujoco_gl_context_initialized
 
         if not self._offscreen_initialized:
@@ -219,20 +233,16 @@ class MuJoCoRobot(Robot ):
             if camera_name in [self.model.camera(i).name for i in range(self.model.ncam)]:
                 self.cam.type = mj.mjtCamera.mjCAMERA_FIXED
                 self.cam.fixedcamid = self.model.camera(camera_name).id
-                self.logger.debug(f"Using fixed camera: {camera_name}")
             else:
                 self.cam.type = mj.mjtCamera.mjCAMERA_FREE
-                mj.mjv_defaultCamera(self.cam)  # Reset to default if the named camera is not found
-                self.logger.debug("Using free camera (default).")
+                mj.mjv_defaultCamera(self.cam)
 
             width, height = 320, 240
             viewport = mj.MjrRect(0, 0, width, height)
-
             rgb_data = np.zeros((height, width, 3), dtype=np.uint8)
             depth_data = np.zeros((height, width), dtype=np.float32)
 
             mj.mjr_render(viewport, self.scn, self.mjr_context)
-
             mj.mjr_readPixels(rgb_data, depth_data, viewport, self.mjr_context)
 
             return {
@@ -243,30 +253,18 @@ class MuJoCoRobot(Robot ):
             }
         except Exception:
             return False
-
+    
     def close(self):
-        """
-        Closes the MuJoCo viewer (if active) and frees the offscreen rendering context.
-        """
+        """Closes the MuJoCo viewer and resources."""
         self.logger.debug("Closing MuJoCo resources.")
         if self.viewer:
-            self.logger.debug("Closing MuJoCo viewer.")
             self.viewer.close()
             self.viewer = None
         if self.mjr_context and self._offscreen_initialized:
-            try:
-                self.mjr_context = None
-                self._offscreen_initialized = False
-            except Exception as e:
-                quit
-        global _mujoco_gl_context_initialized
-        if _mujoco_gl_context_initialized:
-            try:
-                _mujoco_gl_context_initialized = False 
-            except Exception as e:
-                quit
-if __name__ == "__main__":
+            self.mjr_context = None
+            self._offscreen_initialized = False
 
+if __name__ == "__main__":
     sim = None
     output_dir = "captured_images"
     os.makedirs(output_dir, exist_ok=True)
@@ -274,47 +272,72 @@ if __name__ == "__main__":
 
     try:
         sim = MuJoCoRobot()
+        #sim.viewer.cam.fixedcamid = sim.model.camera('gripper_camera').id
+        #sim.viewer.cam.type = mj.mjtCamera.mjCAMERA_FIXED
         initial_pose = sim.pose()
         initial_pos = initial_pose[:3, 3].copy()
         initial_rot = initial_pose[:3, :3].copy()
 
-        target_pos = initial_pos + np.array([0.1, 0.0, 0.0])
+        target_pos = initial_pos + np.array([0.1, 0.0, 0.06])
         target_rot = initial_rot
+
+
         target_pose_matrix = t3d.affines.compose(target_pos, target_rot, [1, 1, 1])
 
         duration_s = 3.0  
         steps_to_simulate = int(duration_s / sim.model.opt.timestep)
-
+        
         for i in range(steps_to_simulate):
             success = sim.send_action(target_pose_matrix)
-            print(f"Current robot pose: {sim.pose()}")
-            if success:
-                # Capture and save an image periodically (e.g., every 50 steps) or at the end
-                if (i % 50 == 0) or (i == steps_to_simulate - 1):
-                    observation = sim.get_observation(camera_name="gripper_camera")
-                    if "camera.rgb" in observation and observation["camera.rgb"] is not None:
-                        rgb_image = Image.fromarray(observation["camera.rgb"])
-                        image_filename = os.path.join(output_dir, f"frame_{i:05d}.png")
-                        rgb_image.save(image_filename)
-                    else:
-                        quit
+            if success and (i % 50 == 0 or i == steps_to_simulate - 1):
+                observation = sim.get_observation(camera_name="gripper_camera")
+                if observation and "camera.rgb" in observation:
+                    Image.fromarray(observation["camera.rgb"]).save(
+                        os.path.join(output_dir, f"frame_{i:05d}.png"))
 
         final_pose = sim.pose()
-        final_pos = final_pose[:3, 3]
-        final_rot = final_pose[:3, :3]
-
-        position_error = np.linalg.norm(final_pos - target_pos)
+        position_error = np.linalg.norm(final_pose[:3, 3] - target_pos)
         tolerance = 0.002 
 
         if position_error <= tolerance:
-            print(f"Robot has arrived to a desired pose with a tolerance of {position_error*1000:.2f} mm")
+            print(f"Robot arrived with tolerance of {position_error*1000:.2f} mm")
         else:
-            print(f"Robot did not arrive at a desired position, position error ({position_error:.4f} m) > tolerance error ({tolerance} m)")
+            print(f"Position error ({position_error:.4f}m) > tolerance ({tolerance}m)")
+
+
+        obj_pose = sim.get_object_pose("pickup_object")
+        print(obj_pose)
+        obj_pos = obj_pose[:3, 3]
+        obj_rot = obj_pose[:3, :3]
+        angle = np.deg2rad(180)
+        rot_off = t3d.axangles.axangle2mat([0, 1, 0], angle)
+
+        approach_pos = obj_pos + np.array([0, 0, 0.2])
+        approach_rot = obj_rot @ rot_off # Match object orientation
+        
+        # Create pose matrix
+        approach_pose = t3d.affines.compose(approach_pos, approach_rot, [1, 1, 1])
+        
+        for i in range(steps_to_simulate):
+            success = sim.send_action(approach_pose)
+        time.sleep(1)
+        sim.gripper_close()
+        time.sleep(1)
+        approach_pos = obj_pos + np.array([0, 0, 0.12])
+        grip_pose = t3d.affines.compose(approach_pos, approach_rot, [1, 1, 1])
+        for i in range(steps_to_simulate):
+            sim.send_action(grip_pose)
+        sim.gripper_open()
+        time.sleep(1)
+        approach_pos = obj_pos + np.array([0, 0, 0.12])
+        grip_pose = t3d.affines.compose(approach_pos, approach_rot, [1, 1, 1])
+        for i in range(steps_to_simulate):
+            sim.send_action(grip_pose)
 
     except Exception as e:
-        quit
+        print(f"Error: {str(e)}")
     finally:
         if sim:
-            print("\nClosing simulation resources...")
+            time.sleep(30)
             sim.close()
     print("Simulation finished.")
