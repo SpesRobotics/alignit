@@ -124,9 +124,7 @@ class MuJoCoRobot(Robot):
         #self._viewer_active = True
         #self._sync_thread = threading.Thread(target=self._sync_viewer_loop, daemon=True)
         #self._sync_thread.start()
-    def update_viewer(self,model,data):
-        mj.mj_forward(model, data)
-        self.viewer.sync()
+
 
     def _sync_viewer_loop(self):
         while self._viewer_active:
@@ -280,7 +278,7 @@ if __name__ == "__main__":
         initial_pos = initial_pose[:3, 3].copy()
         initial_rot = initial_pose[:3, :3].copy()
 
-        target_pos = initial_pos + np.array([0.1, 0.2, 0.06])
+        target_pos = initial_pos + np.array([0.1, 0.0, 0.06])
         target_rot = initial_rot
 
 
@@ -306,7 +304,7 @@ if __name__ == "__main__":
         else:
             print(f"Position error ({position_error:.4f}m) > tolerance ({tolerance}m)")
 
-        time.sleep(1)
+
         obj_pose = sim.get_object_pose("pickup_object")
         print(obj_pose)
         obj_pos = obj_pose[:3, 3]
@@ -316,7 +314,7 @@ if __name__ == "__main__":
 
         approach_pos = obj_pos + np.array([0, 0, 0.2])
         approach_rot = obj_rot @ rot_off # Match object orientation
-        time.sleep(1)
+        
         # Create pose matrix
         approach_pose = t3d.affines.compose(approach_pos, approach_rot, [1, 1, 1])
         
@@ -325,18 +323,16 @@ if __name__ == "__main__":
         time.sleep(1)
         sim.gripper_close()
         time.sleep(1)
-        approach_pos = obj_pos + np.array([0, 0, 0.15])
+        approach_pos = obj_pos + np.array([0, 0, 0.12])
         grip_pose = t3d.affines.compose(approach_pos, approach_rot, [1, 1, 1])
         for i in range(steps_to_simulate):
             sim.send_action(grip_pose)
         sim.gripper_open()
         time.sleep(1)
-        approach_pos = obj_pos + np.array([0, 0, 0.25])
+        approach_pos = obj_pos + np.array([0, 0, 0.12])
         grip_pose = t3d.affines.compose(approach_pos, approach_rot, [1, 1, 1])
         for i in range(steps_to_simulate):
             sim.send_action(grip_pose)
-
-        
 
     except Exception as e:
         print(f"Error: {str(e)}")
