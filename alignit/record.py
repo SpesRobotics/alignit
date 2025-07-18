@@ -9,6 +9,7 @@ from alignit.utils.zhou import se3_sixd
 from alignit.robots.robot import Robot
 import shutil
 import os
+from scipy.spatial.transform import Rotation as R
 def generate_spiral_trajectory(
     start_pose,
     z_step=0.001,
@@ -78,22 +79,36 @@ def main():
         "images": Sequence(Image()),
         "action": Sequence(Value("float32"))
     })
+    obj_id = robot.model.body("pickup_object").id
 
-    # Setup target poses
-    pose_final_target = t3d.affines.compose(
-        [0.180, 0, 0.152], t3d.euler.euler2mat(np.pi, 0, 0), [1, 1, 1]
-    )
-    pose_alignment_target = pose_final_target @ t3d.affines.compose(
-        [0., 0, -0.15], t3d.euler.euler2mat(0, 0, 0), [1, 1, 1]
-    )
+    new_position = np.array([0.1, 0.1, 0.2])  
+    new_orientation_euler = np.array([0, 0, np.pi/2])      
+    new_orientation_mat = R.from_euler('xyz', new_orientation_euler).as_matrix()
+    robot.data.body(obj_id).xpos = new_position
+
+    robot.data.body(obj_id).xmat = new_orientation_mat.flatten()
+    robot.update_viewer(robot.model,robot.data)
+    
+    obj_pose = robot.get_object_pose("pickup_object")
+    initial_pose=robot.pose()
+    initial_rot = initial_pose[:3,:3]
+
+    obj_pos = obj_pose[:3, 3]
+
+    approach_pos = obj_pos + np.array([0, 0, 0.1])
+    approach_rot =  initial_rot # Match object orientation
+    approach_pose = t3d.affines.compose(approach_pos, approach_rot, [1, 1, 1])
+
+    pose_alignment_target = approach_pose
+
     pose_record_start = pose_alignment_target @ t3d.affines.compose(
-        [0, 0, 0.05], t3d.euler.euler2mat(0, 0, 0), [1, 1, 1]
+        [0, 0, -0.08], t3d.euler.euler2mat(0, 0, 0), [1, 1, 1]
     )
-    print("Current robot pose: ")
+    print(obj_pose)
     # Move to initial position
-    robot.servo_to_pose(pose_final_target)
-
-    for episode in range(5):
+    robot.servo_to_pose(approach_pose,lin_tol=0.002)
+    time.sleep(1)
+    for episode in range(30):
         # Randomize starting position slightly
         pose_episode_start = pose_record_start.copy()
         pose_episode_start[:3, 3] += np.random.uniform(
