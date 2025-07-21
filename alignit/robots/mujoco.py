@@ -33,7 +33,7 @@ class MuJoCoRobot(Robot):
             self.model = mj.MjModel.from_xml_path(str(mjcf_path))
             self.data = mj.MjData(self.model)
 
-            self.model.opt.timestep = 0.005
+            self.model.opt.timestep = 0.0005
             self.model.opt.iterations = 50
             self.model.opt.tolerance = 1e-8
             self.model.opt.solver = mj.mjtSolver.mjSOL_NEWTON
@@ -134,24 +134,24 @@ class MuJoCoRobot(Robot):
 
     def gripper_close(self):
         self._set_gripper_position(self.gripper_close_pos)
-        self.viewer.sync()
-
+        
     def gripper_open(self):
         self._set_gripper_position(self.gripper_open_pos)
-        self.viewer.sync()
 
     def gripper_off(self):
             self._set_gripper_position(0.0)
 
     def _set_gripper_position(self, pos):
         target_pos = np.clip(pos, self.gripper_close_pos, self.gripper_open_pos)
-        steps = 20  # Number of steps for smooth movement
+        steps = 200  # Number of steps for smooth movement
         delta = (target_pos - self.current_gripper_pos) / steps
         
         for _ in range(steps):
             self.current_gripper_pos += delta
             self.data.ctrl[self.gripper_ctrl_id] = self.current_gripper_pos
             mj.mj_step(self.model, self.data)
+            self.viewer.sync()
+
 
     def send_action(self, target_pose_matrix):
         """
@@ -159,14 +159,13 @@ class MuJoCoRobot(Robot):
         This function now drives JacobiRobot's internal state using its servo_to_pose,
         and then applies JacobiRobot's internal joint configuration to MuJoCo.
         """
-    
+
         try:
             base_pos = self.data.xpos[self.model.body("link_base").id]
             base_rot = self.data.xmat[self.model.body("link_base").id].reshape(3,3)
             world_to_base = t3d.affines.compose(base_pos, base_rot, [1,1,1])
         except KeyError:
             world_to_base = np.eye(4)
-
         base_target_pose = np.linalg.inv(world_to_base) @ target_pose_matrix
         servo_dt = self.model.opt.timestep   
         self.robot_jacobi.servo_to_pose(base_target_pose, dt=servo_dt)

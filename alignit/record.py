@@ -80,7 +80,9 @@ def main():
         "images": Sequence(Image()),
         "action": Sequence(Value("float32"))
     })
-
+    
+    robot.gripper_close()
+    time.sleep(1)
     obj_pose = robot.get_object_pose("pickup_object")
     initial_pose=robot.pose()
     initial_rot = initial_pose[:3,:3]
@@ -99,23 +101,26 @@ def main():
     print(obj_pose)
     # Move to initial position
     robot.servo_to_pose(approach_pose,lin_tol=0.005)
-    robot.gripper_close()
     time.sleep(1)
     off_rot = t3d.euler.euler2mat(0, 0, np.pi/2)
-    current_pos= approach_pose[:3,3] + np.array([-0.02, 0.05, 0.2])
+    current_pos= approach_pose[:3,3] + np.array([-0.025, 0, -0.015])
     new_rot = obj_rot @ off_rot
     rotated_pose = t3d.affines.compose(current_pos, new_rot, [1, 1, 1])
     robot.servo_to_pose(rotated_pose,lin_tol=0.008)
-    robot.gripper_close()
+    curr = robot.pose()
+    print("iznad")
     time.sleep(1)
-    off_rot = t3d.euler.euler2mat(0, 0, np.pi/1.6)
-    current_pos= approach_pose[:3,3] + np.array([-0.03, 0.035, -0.03])
-    new_rot = obj_rot @ off_rot
-    rotated_pose = t3d.affines.compose(current_pos, new_rot, [1, 1, 1])
-    robot.servo_to_pose(rotated_pose,lin_tol=0.008)
-    robot.gripper_close()
+    print("baguje")
+    time.sleep(1)
+    curr_rot = curr[:3,:3]
+    current_pos= curr[:3,3] + np.array([0, 0, -0.035])
+    new_rot = curr_rot @ off_rot
+    rotated_pose = t3d.affines.compose(current_pos, curr_rot, [1, 1, 1])
+    robot.servo_to_pose(rotated_pose,lin_tol=0.001)
+    print("doso")
+    
+   
 
-    time.sleep(41)
     # for episode in range(30):
     #     # Randomize starting position slightly
     #     pose_episode_start = pose_record_start.copy()
@@ -175,7 +180,6 @@ def main():
     #         shutil.rmtree("data/duck")
     #     shutil.move(temp_path, "data/duck")
 
-    robot.close()
 
 if __name__ == "__main__":
     main()
