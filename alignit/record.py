@@ -80,8 +80,14 @@ def main():
         "images": Sequence(Image()),
         "action": Sequence(Value("float32"))
     })
-    
+    time.sleep(5)
     robot.gripper_close()
+    time.sleep(1)
+    robot.gripper_open()
+    time.sleep(1)
+    robot.gripper_close()
+    time.sleep(1)
+    robot.gripper_open()
     time.sleep(1)
     obj_pose = robot.get_object_pose("pickup_object")
     initial_pose=robot.pose()
@@ -103,22 +109,26 @@ def main():
     robot.servo_to_pose(approach_pose,lin_tol=0.005)
     time.sleep(1)
     off_rot = t3d.euler.euler2mat(0, 0, np.pi/2)
-    current_pos= approach_pose[:3,3] + np.array([-0.025, 0, -0.015])
+    current_pos= approach_pose[:3,3] + np.array([-0.030, 0, -0.01])
     new_rot = obj_rot @ off_rot
     rotated_pose = t3d.affines.compose(current_pos, new_rot, [1, 1, 1])
     robot.servo_to_pose(rotated_pose,lin_tol=0.008)
     curr = robot.pose()
-    print("iznad")
     time.sleep(1)
-    print("baguje")
     time.sleep(1)
     curr_rot = curr[:3,:3]
-    current_pos= curr[:3,3] + np.array([0, 0, -0.035])
+    current_pos= curr[:3,3] + np.array([0.008, 0, 0]) # -0.035
+    new_rot = curr_rot @ off_rot
+    rotated_pose = t3d.affines.compose(current_pos, curr_rot, [1, 1, 1])
+    robot.servo_to_pose(rotated_pose,lin_tol=0.005)
+    print("done")
+    curr = robot.pose()
+    time.sleep(5)
+    curr_rot = curr[:3,:3]
+    current_pos= curr[:3,3] + np.array([0, 0, -0.01]) # -0.035
     new_rot = curr_rot @ off_rot
     rotated_pose = t3d.affines.compose(current_pos, curr_rot, [1, 1, 1])
     robot.servo_to_pose(rotated_pose,lin_tol=0.001)
-    print("doso")
-    
    
 
     # for episode in range(30):
