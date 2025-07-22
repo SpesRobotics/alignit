@@ -33,7 +33,7 @@ class MuJoCoRobot(Robot):
             self.model = mj.MjModel.from_xml_path(str(mjcf_path))
             self.data = mj.MjData(self.model)
 
-            self.model.opt.timestep = 0.01
+            self.model.opt.timestep = 0.0001
             self.model.opt.iterations = 50
             self.model.opt.tolerance = 1e-8
             self.model.opt.solver = mj.mjtSolver.mjSOL_NEWTON
@@ -137,12 +137,17 @@ class MuJoCoRobot(Robot):
 
     def gripper_close(self):
         self._set_gripper_position(self.gripper_close_pos)
+        mj.mj_forward(self.model, self.data)
+        self.viewer.sync()
         
     def gripper_open(self):
         self._set_gripper_position(self.gripper_open_pos)
+        mj.mj_forward(self.model, self.data)
+        self.viewer.sync()
 
     def gripper_off(self):
             self._set_gripper_position(0.0)
+            self.viewer.sync()
 
     def _set_gripper_position(self, pos):
         target_pos = np.clip(pos, self.gripper_close_pos, self.gripper_open_pos)
