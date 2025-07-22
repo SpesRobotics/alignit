@@ -33,7 +33,7 @@ class MuJoCoRobot(Robot):
             self.model = mj.MjModel.from_xml_path(str(mjcf_path))
             self.data = mj.MjData(self.model)
 
-            self.model.opt.timestep = 0.0005
+            self.model.opt.timestep = 0.01
             self.model.opt.iterations = 50
             self.model.opt.tolerance = 1e-8
             self.model.opt.solver = mj.mjtSolver.mjSOL_NEWTON
@@ -131,6 +131,9 @@ class MuJoCoRobot(Robot):
             if self.viewer and self.viewer.is_running():
                 self.viewer.sync()
             time.sleep(0.005)  # ~200Hz refresh
+    def update_sim(self):
+        mj.mj_forward(self.model, self.data)
+        self.viewer.sync()
 
     def gripper_close(self):
         self._set_gripper_position(self.gripper_close_pos)

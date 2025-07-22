@@ -3,9 +3,10 @@ from alignit.models.alignnet import AlignNet
 from alignit.utils.zhou import sixd_se3
 from alignit.robots.bullet import Bullet
 from alignit.utils.tfs import print_pose
+from alignit.robots.mujoco import MuJoCoRobot
 import transforms3d as t3d
 import numpy as np
-
+import time
 
 def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -18,13 +19,14 @@ def main():
     net.to(device)
     net.eval()
 
-    robot = Bullet()
+    robot = MuJoCoRobot()
 
     start_pose = t3d.affines.compose(
-        [0.5, 0.1, 0.2], t3d.euler.euler2mat(np.pi, 0, 0), [1, 1, 1]
+        [0.190, 0.1, 0.2], t3d.euler.euler2mat(np.pi, 0, 0), [1, 1, 1]
     )
     robot.servo_to_pose(start_pose)
-
+    total = 0
+    tick = 0
     try:
         while True:
             observation = robot.get_observation()
@@ -33,7 +35,7 @@ def main():
             # Convert images to tensor and reshape from HWC to CHW format
             images_tensor = torch.tensor(images, dtype=torch.float32).permute(0, 3, 1, 2).unsqueeze(0).to(device)
             print(torch.max(images_tensor))
-            
+            start = time.time()
             with torch.no_grad():
                 relative_action = net(images_tensor)
             relative_action = relative_action.squeeze(0).cpu().numpy()
@@ -41,6 +43,12 @@ def main():
             print_pose(relative_action)
 
             action = robot.pose() @ relative_action
+            elapsed = time.time() - start
+            total = total + elapsed
+            tick += 1
+            avg=total/tick
+            print(avg)
+
             robot.send_action(action)
     except KeyboardInterrupt:
         print("\nExiting...")
