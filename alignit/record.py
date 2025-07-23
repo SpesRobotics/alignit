@@ -128,8 +128,22 @@ def main():
     current_pos= curr[:3,3] + np.array([0, 0, 0.1]) # -0.035
     new_rot = curr_rot @ off_rot
     rotated_pose = t3d.affines.compose(current_pos, curr_rot, [1, 1, 1])
-    robot.servo_to_pose(rotated_pose,lin_tol=0.001)
-    robot.gripper_open()
+    robot.servo_to_pose(rotated_pose,lin_tol=0.005)
+    print("moved")
+    time.sleep(2)
+    print("generating random rpy")
+    rotation =  t3d.euler.euler2mat(np.pi/1.4, np.pi/0.9, np.pi/2.3)
+    print(rotation)
+    curr = robot.pose()
+    curr_rot = curr[:3,:3]
+    current_pos= curr[:3,3] # -0.035
+    new_rot = curr_rot @ rotation
+    rotated_pose = t3d.affines.compose(current_pos, new_rot, [1, 1, 1])
+    print(f"moving to {rotated_pose}")
+    robot.servo_to_pose(rotated_pose,lin_tol=0.005)
+    robot.gripper_close()
+    print(f"moved to {rotated_pose}")
+
     time.sleep(100)
    
 
