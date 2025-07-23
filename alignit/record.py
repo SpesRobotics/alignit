@@ -81,7 +81,6 @@ def main():
         "action": Sequence(Value("float32"))
     })
     robot.gripper_close()
-    time.sleep(1)
     obj_pose = robot.get_object_pose("pickup_object")
     initial_pose=robot.pose()
     initial_rot = initial_pose[:3,:3]
@@ -100,15 +99,12 @@ def main():
     print(obj_pose)
     # Move to initial position
     robot.servo_to_pose(approach_pose,lin_tol=0.005)
-    time.sleep(1)
     off_rot = t3d.euler.euler2mat(0, 0, np.pi/2)
     current_pos= approach_pose[:3,3] + np.array([-0.030, 0, -0.01])
     new_rot = obj_rot @ off_rot
     rotated_pose = t3d.affines.compose(current_pos, new_rot, [1, 1, 1])
     robot.servo_to_pose(rotated_pose,lin_tol=0.008)
     curr = robot.pose()
-    time.sleep(1)
-    time.sleep(1)
     curr_rot = curr[:3,:3]
     current_pos= curr[:3,3] + np.array([0.008, 0, 0]) # -0.035
     new_rot = curr_rot @ off_rot
@@ -122,16 +118,14 @@ def main():
     current_pos= curr[:3,3] + np.array([0, 0, -0.02]) # -0.035
     new_rot = curr_rot @ off_rot
     rotated_pose = t3d.affines.compose(current_pos, curr_rot, [1, 1, 1])
-    robot.gripper_open()
-    time.sleep(1)
     robot.servo_to_pose(rotated_pose,lin_tol=0.001) 
+    robot.gripper_open()
     curr_rot = curr[:3,:3]
     current_pos= curr[:3,3] + np.array([0, 0, 0.1]) # -0.035
     new_rot = curr_rot @ off_rot
     rotated_pose = t3d.affines.compose(current_pos, curr_rot, [1, 1, 1])
     robot.servo_to_pose(rotated_pose,lin_tol=0.005)
     print("moved")
-    time.sleep(2)
     print("generating random rpy")
     rotation =  t3d.euler.euler2mat(np.pi/1.4, np.pi/0.9, np.pi/2.3)
     print(rotation)
@@ -143,8 +137,8 @@ def main():
     print(f"moving to {rotated_pose}")
     robot.servo_to_pose(rotated_pose,lin_tol=0.005)
     robot.gripper_close()
-    time.sleep(1)
     print(f"moved to {rotated_pose}")
+   
 
     time.sleep(100)
    
