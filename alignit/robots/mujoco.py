@@ -137,28 +137,23 @@ class MuJoCoRobot(Robot):
 
     def gripper_close(self):
         self._set_gripper_position(self.gripper_close_pos)
-        mj.mj_forward(self.model, self.data)
-        self.viewer.sync()
         
     def gripper_open(self):
         self._set_gripper_position(self.gripper_open_pos)
-        mj.mj_forward(self.model, self.data)
-        self.viewer.sync()
 
     def gripper_off(self):
             self._set_gripper_position(0.0)
-            self.viewer.sync()
 
-    def _set_gripper_position(self, pos):
+
+    def _set_gripper_position(self, pos, tolerance=1e-3, max_sim_steps=5000): # Increased max_sim_steps for safety
         target_pos = np.clip(pos, self.gripper_close_pos, self.gripper_open_pos)
-        steps = 200  # Number of steps for smooth movement
-        delta = (target_pos - self.current_gripper_pos) / steps
-        
-        for _ in range(steps):
-            self.current_gripper_pos += delta
-            self.data.ctrl[self.gripper_ctrl_id] = self.current_gripper_pos
+        self.data.ctrl[self.gripper_ctrl_id] = target_pos
+        steps_taken = 0
+        while abs(self.data.qpos[self.gripper_ctrl_id] - target_pos) > tolerance and steps_taken < max_sim_steps:
             mj.mj_step(self.model, self.data)
-            self.viewer.sync()
+            self.viewer.sync() 
+            steps_taken += 1
+            self.current_gripper_pos = target_pos 
 
 
     def send_action(self, target_pose_matrix):

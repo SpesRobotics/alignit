@@ -81,6 +81,7 @@ def main():
         "action": Sequence(Value("float32"))
     })
     robot.gripper_close()
+    time.sleep(1)
     obj_pose = robot.get_object_pose("pickup_object")
     initial_pose=robot.pose()
     initial_rot = initial_pose[:3,:3]
@@ -122,8 +123,8 @@ def main():
     new_rot = curr_rot @ off_rot
     rotated_pose = t3d.affines.compose(current_pos, curr_rot, [1, 1, 1])
     robot.gripper_open()
-    robot.servo_to_pose(rotated_pose,lin_tol=0.001) 
     time.sleep(1)
+    robot.servo_to_pose(rotated_pose,lin_tol=0.001) 
     curr_rot = curr[:3,:3]
     current_pos= curr[:3,3] + np.array([0, 0, 0.1]) # -0.035
     new_rot = curr_rot @ off_rot
@@ -142,6 +143,7 @@ def main():
     print(f"moving to {rotated_pose}")
     robot.servo_to_pose(rotated_pose,lin_tol=0.005)
     robot.gripper_close()
+    time.sleep(1)
     print(f"moved to {rotated_pose}")
 
     time.sleep(100)
