@@ -18,18 +18,24 @@ def generate_spiral_trajectory(
     visible_sweep=180,
     viewing_angle_offset=0,
     angular_resolution=5,
-    include_cone_poses=True  # New: toggle for cone poses
+    include_cone_poses=True
 ):
     """
-    Generate optimized spiral trajectory with adjustable rotation speed.
+    Generate spiral trajectory that maintains the initial object rotation throughout.
     
     Args:
-        viewing_angle_offset: Rotates the visible window (0°=forward, 90°=left)
-        angular_resolution: Degrees between cone poses (larger=faster rotation)
-        include_cone_poses: If False, generates only the spiral without cone poses
+        start_pose: Initial pose (should match pickup object's rotation)
+        z_step: Step size in z-axis (depth)
+        radius_step: Step size for spiral radius
+        num_steps: Number of steps in spiral
+        cone_angle: Angle of cone for viewing (if include_cone_poses is True)
+        visible_sweep: Angular sweep for viewing (if include_cone_poses is True)
+        viewing_angle_offset: Offset for viewing angle (if include_cone_poses is True)
+        angular_resolution: Resolution for viewing angles (if include_cone_poses is True)
+        include_cone_poses: Whether to include viewing cone poses
     """
     trajectory = []
-    R_start = start_pose[:3, :3]
+    R_start = start_pose[:3, :3]  # This maintains the object's initial rotation
     t_start = start_pose[:3, 3]
     cone_angle_rad = np.deg2rad(cone_angle)
     
@@ -38,37 +44,41 @@ def generate_spiral_trajectory(
     end_angle = visible_sweep/2 + viewing_angle_offset
     
     for i in range(num_steps):
-        # Spiral motion
+        # Spiral motion - only translate, keep rotation constant
         radius = radius_step * i
-        angle = 2 * np.pi * i / 10
+        angle = 2 * np.pi * i / 10  # This controls the spiral pattern
         
+        # Calculate position in local frame
         local_offset = np.array([
             radius * np.cos(angle),
             radius * np.sin(angle),
             -z_step * i
         ])
+        
+        # Transform to world frame using initial rotation
         world_offset = R_start @ local_offset
         base_position = t_start + world_offset
         
-        # Add initial pose with same orientation as start pose
-        T_initial = np.eye(4)
-        T_initial[:3, :3] = R_start
-        T_initial[:3, 3] = base_position
-        trajectory.append(T_initial)
+        # Create pose with initial rotation and new position
+        T = np.eye(4)
+        T[:3, :3] = R_start  # Maintain the same rotation throughout
+        T[:3, 3] = base_position
+        trajectory.append(T)
         
         if include_cone_poses:
             # Generate visible poses with adjustable resolution
             for deg in np.arange(start_angle, end_angle, angular_resolution):
                 theta = np.deg2rad(deg)
                 
+                # Apply cone rotations relative to initial orientation
                 tilt = t3d.euler.euler2mat(cone_angle_rad, 0, 0)
                 spin = t3d.euler.euler2mat(0, 0, theta)
-                R_cone = R_start @ spin @ tilt
+                R_cone = R_start @ spin @ tilt  # Rotate relative to initial orientation
                 
-                T = np.eye(4)
-                T[:3, :3] = R_cone
-                T[:3, 3] = base_position
-                trajectory.append(T)
+                T_cone = np.eye(4)
+                T_cone[:3, :3] = R_cone
+                T_cone[:3, 3] = base_position
+                trajectory.append(T_cone)
             
     return trajectory
 
@@ -95,12 +105,11 @@ def main():
     )
     print("Current robot pose: ")
     # Move to initial position
-    robot.servo_to_pose(pose_record_start)
-    for episode in range(20):
+    for episode in range(30):
         
         random_pos = [
-        0.25 + np.random.uniform(-0.05, 0.05),  
-        0.0 + np.random.uniform(-0.05, 0.05),    
+        0.25 + np.random.uniform(-0.01, 0.01),  
+        0.0 + np.random.uniform(-0.01, 0.01),    
         0.08   
         ]
         roll = np.pi  
@@ -116,32 +125,29 @@ def main():
         robot.set_object_pose("pickup_object", pose)
         
         pose1 = robot.get_object_pose()
-        transl = pose1[:3,3] + np.array([0,0,0.15])
-        rot = pose1[:3,:3]
+        object_z_axis = pose1[:3, 2]  # The Z-axis of the object's coordinate frame
+
+        # Offset along the object's Z-axis by 0.15 meters
+        offset_distance = -0.15
+        offset_vector = object_z_axis * offset_distance
+
+        transl = pose1[:3, 3] + offset_vector  # Add offset in object's Z direction
+        rot = pose1[:3, :3]
+
         pose_final_target = t3d.affines.compose(
-       transl, t3d.euler.euler2mat(np.pi, 0, 0), [1, 1, 1]
+            transl, rot, [1, 1, 1]
         )
 
-        pose_alignment_target = pose_final_target @ t3d.affines.compose(
-            [0., 0, -0.15], t3d.euler.euler2mat(0, 0, 0), [1, 1, 1]
-        )
-        pose_record_start = pose_alignment_target @ t3d.affines.compose(
-            [0, 0, 0.05], t3d.euler.euler2mat(0, 0, 0), [1, 1, 1]
-        )
         # Randomize starting position slightly
-        pose_episode_start = pose_record_start.copy()
-        pose_episode_start[:3, 3] += np.random.uniform(
-            low=[-0.03, -0.03, -0.1],
-            high=[0.03, 0.03, 0.01]
-        )
+        robot.servo_to_pose(pose_final_target, lin_tol=0.015,ang_tol=0.015)
+        print("sleeping")
         robot.groff()
-        robot.servo_to_pose(pose_episode_start)
         # Generate trajectory with conical rotations
         trajectory = generate_spiral_trajectory(
-            pose_episode_start,
-            z_step=0.0005,
-            radius_step=0.0005,
-            num_steps=200,
+            pose_final_target,
+            z_step=0.001,        # Increased from 0.0005
+            radius_step=0.001,   # Increased from 0.0005
+            num_steps=100,       # Reduced from 200 since steps are larger
             cone_angle=30,
             visible_sweep=60,
             viewing_angle_offset=-120,
@@ -153,7 +159,7 @@ def main():
         i = 0
         for pose in trajectory:
             # Execute motion
-            robot.servo_to_pose(pose, lin_tol=0.05,ang_tol=0.2)
+            robot.servo_to_pose(pose, lin_tol=0.05,ang_tol=0.05)
             current_pose = robot.pose()
 
             # Calculate action (relative to alignment target)
@@ -167,6 +173,7 @@ def main():
                 "action": action_sixd
             }
             frames.append(frame)
+            print(f"moved to {pose}")
             i = i +1
             print(f"Completed : {i} %")
         

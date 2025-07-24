@@ -33,7 +33,7 @@ class MuJoCoRobot(Robot):
             self.model = mj.MjModel.from_xml_path(str(mjcf_path))
             self.data = mj.MjData(self.model)
 
-            self.model.opt.timestep = 0.008
+            self.model.opt.timestep = 0.001
             self.model.opt.iterations = 50
             self.model.opt.tolerance = 1e-8
             self.model.opt.solver = mj.mjtSolver.mjSOL_NEWTON
