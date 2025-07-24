@@ -122,6 +122,7 @@ class MuJoCoRobot(Robot):
         self.viewer.sync()
         time.sleep(1.0)
     def stop_object_movement(self, object_name="pickup_object"):
+        start_time = self.data.time
         while self.data.body("pickup_object").xpos[2] > 0.08:  
             print(self.data.body("pickup_object").xpos[2])
             mj.mj_step(self.model, self.data)
@@ -135,63 +136,77 @@ class MuJoCoRobot(Robot):
             mj.mj_forward(self.model, self.data)
     def reset(self):
         self.gripper_close()
+        
+        # Get initial poses
         obj_pose = self.get_object_pose("pickup_object")
-        initial_pose=self.pose()
+        initial_pose = self.pose()
         initial_rot = initial_pose[:3,:3]
-
         obj_pos = obj_pose[:3, 3]
         obj_rot = obj_pose[:3,:3]
-        approach_pos = obj_pos + np.array([0, 0, 0.1])
-        approach_rot =  initial_rot # Match object orientation
-        approach_pose = t3d.affines.compose(approach_pos, approach_rot, [1, 1, 1])
-        self.servo_to_pose(approach_pose,lin_tol=0.005)
+        print(initial_rot)
+        # Approach in world Z-axis (unchanged)
+        local_offset1 = np.array([0, 0, -0.15])
+        world_offset1 = obj_rot @ local_offset1 
+        approach_pos = obj_pos + world_offset1
+        approach_pose = t3d.affines.compose(approach_pos, obj_rot, [1, 1, 1])
+        self.servo_to_pose(approach_pose, lin_tol=0.003, ang_tol=0.05)
+
+        # First offset - transformed to object frame
+        local_offset1 = np.array([-0.030, 0, 0.015])  # In object frame
+        world_offset1 = obj_rot @ local_offset1  # Transform to world frame
+        current_pos = approach_pose[:3,3] + world_offset1
         off_rot = t3d.euler.euler2mat(0, 0, np.pi/2)
-        current_pos= approach_pose[:3,3] + np.array([-0.030, 0, -0.01])
         new_rot = obj_rot @ off_rot
         rotated_pose = t3d.affines.compose(current_pos, new_rot, [1, 1, 1])
-        self.servo_to_pose(rotated_pose,lin_tol=0.008)
-        curr = self.pose()
-        curr_rot = curr[:3,:3]
-        current_pos= curr[:3,3] + np.array([0.008, 0, 0]) # -0.035
-        new_rot = curr_rot @ off_rot
-        rotated_pose = t3d.affines.compose(current_pos, curr_rot, [1, 1, 1])
-        self.servo_to_pose(rotated_pose,lin_tol=0.005)
-        curr = self.pose()
+        self.servo_to_pose(rotated_pose, lin_tol=0.003, ang_tol=0.05)
+
+        # Second offset - in current gripper frame
+        curr_pose = self.pose()
+        local_offset2 = np.array([0.008, 0, 0])  # In gripper frame
+        world_offset2 = curr_pose[:3,:3] @ local_offset2
+        current_pos = curr_pose[:3,3] + world_offset2
+        rotated_pose = t3d.affines.compose(current_pos, curr_pose[:3,:3], [1, 1, 1])
+        self.servo_to_pose(rotated_pose, lin_tol=0.003, ang_tol=0.05)
+
+        # Third offset - in current gripper frame (Z-axis)
         time.sleep(1)
-        curr_rot = curr[:3,:3]
-        current_pos= curr[:3,3] + np.array([0, 0, -0.02]) # -0.035
-        new_rot = curr_rot @ off_rot
-        rotated_pose = t3d.affines.compose(current_pos, curr_rot, [1, 1, 1])
-        self.servo_to_pose(rotated_pose,lin_tol=0.001) 
+        curr_pose = self.pose()
+        local_offset3 = np.array([0, 0, 0.07])  # In gripper frame
+        world_offset3 = curr_pose[:3,:3] @ local_offset3
+        current_pos = curr_pose[:3,3] + world_offset3
+        rotated_pose = t3d.affines.compose(current_pos, curr_pose[:3,:3], [1, 1, 1])
+        self.servo_to_pose(rotated_pose, lin_tol=0.001, ang_tol=0.05)
+        
+        # Open gripper and lift - world Z-axis
         self.gripper_open()
-        curr_rot = curr[:3,:3]
-        current_pos= curr[:3,3] + np.array([0, 0, 0.1]) # -0.035
-        new_rot = curr_rot @ off_rot
-        rotated_pose = t3d.affines.compose(current_pos, curr_rot, [1, 1, 1])
-        self.servo_to_pose(rotated_pose,lin_tol=0.005)
+
+        current_pos = curr_pose[:3,3] + np.array([0, 0, 0.1])  # World frame
+        rotated_pose = t3d.affines.compose(current_pos, curr_pose[:3,:3], [1, 1, 1])
+        self.servo_to_pose(rotated_pose, lin_tol=0.003, ang_tol=0.05)
+        self.model.opt.gravity[:]=[0,0,-9.81]
+        mj.mj_forward(self.model, self.data)
+        # Apply random rotation in object frame
         angle_x = np.random.uniform(-0.3, 0.3) 
         angle_y = np.random.uniform(-0.3, 0.3)   
-        angle_z = np.random.uniform(-np.pi, np.pi)  
-
-        rotation = t3d.euler.euler2mat(
-            np.pi/6 + angle_x,  
-            np.pi/6 + angle_y,  
-            np.pi/6 + angle_z   
-        ) 
-        curr = self.pose()
-        curr_rot = curr[:3,:3]
-        current_pos= curr[:3,3] # -0.035
-        new_rot = curr_rot @ rotation
-        rotated_pose = t3d.affines.compose(current_pos, new_rot, [1, 1, 1])
-        self.servo_to_pose(rotated_pose,lin_tol=0.005)
+        angle_z = np.random.uniform(-np.pi, np.pi)
+        random_rot = t3d.euler.euler2mat(np.pi/6 + angle_x,
+                                        np.pi/6 + angle_y,
+                                        np.pi/6 + angle_z)
+        const_rot = np.array([[9.99996083e-01, -5.31966273e-07, -2.79879023e-03], [-5.40655149e-07, -1.00000000e+00, -3.10375475e-06], [-2.79879023e-03, 3.10525578e-06, -9.99996083e-01]])
+        curr_pose = self.pose()
+        new_rot = const_rot @ random_rot
+        rotated_pose = t3d.affines.compose(curr_pose[:3,3], new_rot, [1, 1, 1])
+        self.servo_to_pose(rotated_pose, lin_tol=0.003, ang_tol=0.05)
+        
+        # Final grasp and lift
         self.gripper_close()
         self.stop_object_movement()
         time.sleep(1)
-        curr = self.get_object_pose()
-        current_pos= curr[:3,3] + np.array([0, 0, 0.4]) # -0.035
+        
+        curr_obj_pose = self.get_object_pose()
+        current_pos = curr_obj_pose[:3,3] + np.array([0, 0, 0.4])  # World Z
         rotated_pose = t3d.affines.compose(current_pos, initial_rot, [1, 1, 1])
-        self.servo_to_pose(rotated_pose,lin_tol=0.005,ang_tol=0.05)
-
+        self.servo_to_pose(rotated_pose, lin_tol=0.003, ang_tol=0.05)
 
 
 
