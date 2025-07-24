@@ -1,16 +1,10 @@
 import time
 import numpy as np
 import transforms3d as t3d
-from alignit.robots.bullet import Bullet
 from alignit.robots.mujoco import MuJoCoRobot
-from alignit.utils.tfs import are_tfs_close
 from datasets import Dataset, Features, Sequence, Value, Image, load_from_disk, concatenate_datasets
-from alignit.utils.zhou import se3_sixd
-from alignit.robots.robot import Robot
-import shutil
-import os
 from scipy.spatial.transform import Rotation as R
-import xml.etree.ElementTree as ET
+import random
 def generate_spiral_trajectory(
     start_pose,
     z_step=0.001,
@@ -80,65 +74,8 @@ def main():
         "images": Sequence(Image()),
         "action": Sequence(Value("float32"))
     })
-    robot.gripper_close()
-    obj_pose = robot.get_object_pose("pickup_object")
-    initial_pose=robot.pose()
-    initial_rot = initial_pose[:3,:3]
-
-    obj_pos = obj_pose[:3, 3]
-    obj_rot = obj_pose[:3,:3]
-    approach_pos = obj_pos + np.array([0, 0, 0.1])
-    approach_rot =  initial_rot # Match object orientation
-    approach_pose = t3d.affines.compose(approach_pos, approach_rot, [1, 1, 1])
-
-    pose_alignment_target = approach_pose
-
-    pose_record_start = pose_alignment_target @ t3d.affines.compose(
-        [0, 0, -0.08], t3d.euler.euler2mat(0, 0, 0), [1, 1, 1]
-    )
-    print(obj_pose)
-    # Move to initial position
-    robot.servo_to_pose(approach_pose,lin_tol=0.005)
-    off_rot = t3d.euler.euler2mat(0, 0, np.pi/2)
-    current_pos= approach_pose[:3,3] + np.array([-0.030, 0, -0.01])
-    new_rot = obj_rot @ off_rot
-    rotated_pose = t3d.affines.compose(current_pos, new_rot, [1, 1, 1])
-    robot.servo_to_pose(rotated_pose,lin_tol=0.008)
-    curr = robot.pose()
-    curr_rot = curr[:3,:3]
-    current_pos= curr[:3,3] + np.array([0.008, 0, 0]) # -0.035
-    new_rot = curr_rot @ off_rot
-    rotated_pose = t3d.affines.compose(current_pos, curr_rot, [1, 1, 1])
-    robot.servo_to_pose(rotated_pose,lin_tol=0.005)
-    print("done")
-    curr = robot.pose()
-    time.sleep(2)
-    time.sleep(2)
-    curr_rot = curr[:3,:3]
-    current_pos= curr[:3,3] + np.array([0, 0, -0.02]) # -0.035
-    new_rot = curr_rot @ off_rot
-    rotated_pose = t3d.affines.compose(current_pos, curr_rot, [1, 1, 1])
-    robot.servo_to_pose(rotated_pose,lin_tol=0.001) 
-    robot.gripper_open()
-    curr_rot = curr[:3,:3]
-    current_pos= curr[:3,3] + np.array([0, 0, 0.1]) # -0.035
-    new_rot = curr_rot @ off_rot
-    rotated_pose = t3d.affines.compose(current_pos, curr_rot, [1, 1, 1])
-    robot.servo_to_pose(rotated_pose,lin_tol=0.005)
-    print("moved")
-    print("generating random rpy")
-    rotation =  t3d.euler.euler2mat(np.pi/1.4, np.pi/0.9, np.pi/2.3)
-    print(rotation)
-    curr = robot.pose()
-    curr_rot = curr[:3,:3]
-    current_pos= curr[:3,3] # -0.035
-    new_rot = curr_rot @ rotation
-    rotated_pose = t3d.affines.compose(current_pos, new_rot, [1, 1, 1])
-    print(f"moving to {rotated_pose}")
-    robot.servo_to_pose(rotated_pose,lin_tol=0.005)
-    robot.gripper_close()
-    print(f"moved to {rotated_pose}")
-   
+    robot.reset()
+    robot.reset()
 
     time.sleep(100)
    

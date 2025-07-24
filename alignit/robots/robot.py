@@ -14,13 +14,5 @@ class Robot:
     def servo_to_pose(self, pose, lin_tol=1e-1, ang_tol=1e-1):
         while not are_tfs_close(self.pose(), pose, lin_tol, ang_tol):
             self.send_action(pose)
-    def gripper_open(self):
-        raise NotImplementedError("This method should be overridden by subclasses.")
-
-    def gripper_close(self):
-        raise NotImplementedError("This method should be overridden by subclasses.")
-
-    def gripper_off(self):
-        raise NotImplementedError("This method should be overridden by subclasses.")
 
         

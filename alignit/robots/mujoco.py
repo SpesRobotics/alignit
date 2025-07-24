@@ -121,9 +121,78 @@ class MuJoCoRobot(Robot):
         mj.mj_forward(self.model, self.data)
         self.viewer.sync()
         time.sleep(1.0)
-        #self._viewer_active = True
-        #self._sync_thread = threading.Thread(target=self._sync_viewer_loop, daemon=True)
-        #self._sync_thread.start()
+    def stop_object_movement(self, object_name="pickup_object"):
+        while self.data.body("pickup_object").xpos[2] > 0.08:  
+            print(self.data.body("pickup_object").xpos[2])
+            mj.mj_step(self.model, self.data)
+            self.viewer.sync()
+        self.model.opt.gravity[:]=[0,0,0]
+        obj_id = self.model.body(object_name).id
+        joint_id = self.model.body_jntadr[obj_id]
+        if joint_id != -1:
+            qvel_adr = self.model.jnt_dofadr[joint_id]
+            self.data.qvel[qvel_adr:qvel_adr+6] = 0 
+            mj.mj_forward(self.model, self.data)
+    def reset(self):
+        self.gripper_close()
+        obj_pose = self.get_object_pose("pickup_object")
+        initial_pose=self.pose()
+        initial_rot = initial_pose[:3,:3]
+
+        obj_pos = obj_pose[:3, 3]
+        obj_rot = obj_pose[:3,:3]
+        approach_pos = obj_pos + np.array([0, 0, 0.1])
+        approach_rot =  initial_rot # Match object orientation
+        approach_pose = t3d.affines.compose(approach_pos, approach_rot, [1, 1, 1])
+        self.servo_to_pose(approach_pose,lin_tol=0.005)
+        off_rot = t3d.euler.euler2mat(0, 0, np.pi/2)
+        current_pos= approach_pose[:3,3] + np.array([-0.030, 0, -0.01])
+        new_rot = obj_rot @ off_rot
+        rotated_pose = t3d.affines.compose(current_pos, new_rot, [1, 1, 1])
+        self.servo_to_pose(rotated_pose,lin_tol=0.008)
+        curr = self.pose()
+        curr_rot = curr[:3,:3]
+        current_pos= curr[:3,3] + np.array([0.008, 0, 0]) # -0.035
+        new_rot = curr_rot @ off_rot
+        rotated_pose = t3d.affines.compose(current_pos, curr_rot, [1, 1, 1])
+        self.servo_to_pose(rotated_pose,lin_tol=0.005)
+        curr = self.pose()
+        time.sleep(1)
+        curr_rot = curr[:3,:3]
+        current_pos= curr[:3,3] + np.array([0, 0, -0.02]) # -0.035
+        new_rot = curr_rot @ off_rot
+        rotated_pose = t3d.affines.compose(current_pos, curr_rot, [1, 1, 1])
+        self.servo_to_pose(rotated_pose,lin_tol=0.001) 
+        self.gripper_open()
+        curr_rot = curr[:3,:3]
+        current_pos= curr[:3,3] + np.array([0, 0, 0.1]) # -0.035
+        new_rot = curr_rot @ off_rot
+        rotated_pose = t3d.affines.compose(current_pos, curr_rot, [1, 1, 1])
+        self.servo_to_pose(rotated_pose,lin_tol=0.005)
+        angle_x = np.random.uniform(-0.3, 0.3) 
+        angle_y = np.random.uniform(-0.3, 0.3)   
+        angle_z = np.random.uniform(-np.pi, np.pi)  
+
+        rotation = t3d.euler.euler2mat(
+            np.pi/6 + angle_x,  
+            np.pi/6 + angle_y,  
+            np.pi/6 + angle_z   
+        ) 
+        curr = self.pose()
+        curr_rot = curr[:3,:3]
+        current_pos= curr[:3,3] # -0.035
+        new_rot = curr_rot @ rotation
+        rotated_pose = t3d.affines.compose(current_pos, new_rot, [1, 1, 1])
+        self.servo_to_pose(rotated_pose,lin_tol=0.005)
+        self.gripper_close()
+        self.stop_object_movement()
+        time.sleep(1)
+        curr = self.get_object_pose()
+        current_pos= curr[:3,3] + np.array([0, 0, 0.4]) # -0.035
+        rotated_pose = t3d.affines.compose(current_pos, initial_rot, [1, 1, 1])
+        self.servo_to_pose(rotated_pose,lin_tol=0.005,ang_tol=0.05)
+
+
 
 
     def _sync_viewer_loop(self):
