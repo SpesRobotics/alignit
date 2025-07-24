@@ -33,7 +33,7 @@ class MuJoCoRobot(Robot):
             self.model = mj.MjModel.from_xml_path(str(mjcf_path))
             self.data = mj.MjData(self.model)
 
-            self.model.opt.timestep = 0.0005
+            self.model.opt.timestep = 0.008
             self.model.opt.iterations = 50
             self.model.opt.tolerance = 1e-8
             self.model.opt.solver = mj.mjtSolver.mjSOL_NEWTON
@@ -124,7 +124,6 @@ class MuJoCoRobot(Robot):
     def stop_object_movement(self, object_name="pickup_object"):
         start_time = self.data.time
         while self.data.body("pickup_object").xpos[2] > 0.08:  
-            print(self.data.body("pickup_object").xpos[2])
             mj.mj_step(self.model, self.data)
             self.viewer.sync()
         self.model.opt.gravity[:]=[0,0,0]
@@ -134,9 +133,51 @@ class MuJoCoRobot(Robot):
             qvel_adr = self.model.jnt_dofadr[joint_id]
             self.data.qvel[qvel_adr:qvel_adr+6] = 0 
             mj.mj_forward(self.model, self.data)
-    def reset(self):
+    def groff(self):
+        self.model.opt.gravity[:]=[0,0,0]
+        mj.mj_forward(self.model, self.data)
+
+    def set_object_pose(self, object_name, pose_matrix):
+        """
+        Set the object's pose using a 4x4 transformation matrix.
+        Compatible with modern MuJoCo Python bindings.
+        """
+        try:
+            # Get body ID
+            body_id = self.model.body(object_name).id
+            
+            # Set position directly in xpos
+            self.data.xpos[body_id] = pose_matrix[:3, 3]
+            
+            # Convert rotation matrix to quaternion (w, x, y, z)
+            quat = t3d.quaternions.mat2quat(pose_matrix[:3, :3])
+            self.data.xquat[body_id] = quat
+            
+            # Alternative method for free joints (if direct xpos/xquat doesn't work)
+            # Find associated joint (if any)
+            joint_id = self.model.body_jntadr[body_id]
+            if joint_id >= 0:  # If body has a joint
+                jnt_type = self.model.jnt_type[joint_id]
+                qpos_adr = self.model.jnt_qposadr[joint_id]
+                
+                if jnt_type == 0:  # mjJNT_FREE
+                    # Set position (first 3) and orientation (next 4)
+                    self.data.qpos[qpos_adr:qpos_adr+3] = pose_matrix[:3, 3]
+                    self.data.qpos[qpos_adr+3:qpos_adr+7] = quat
+                    # Zero velocity
+                    qvel_adr = self.model.jnt_dofadr[joint_id]
+                    self.data.qvel[qvel_adr:qvel_adr+6] = 0
+            
+            # Update simulation
+            mj.mj_forward(self.model, self.data)
+            
+        except Exception as e:
+            print(f"Error setting pose for {object_name}: {str(e)}")
+            print("Available bodies:", [self.model.body(i).name for i in range(self.model.nbody)])
+            raise
+    def reset_auto(self):
         self.gripper_close()
-        
+        self.model.opt.gravity[:]=[0,0,0]
         # Get initial poses
         obj_pose = self.get_object_pose("pickup_object")
         initial_pose = self.pose()
@@ -149,8 +190,9 @@ class MuJoCoRobot(Robot):
         world_offset1 = obj_rot @ local_offset1 
         approach_pos = obj_pos + world_offset1
         approach_pose = t3d.affines.compose(approach_pos, obj_rot, [1, 1, 1])
-        self.servo_to_pose(approach_pose, lin_tol=0.003, ang_tol=0.05)
-
+        
+        self.servo_to_pose(approach_pose, lin_tol=0.003, ang_tol=0.1)
+        print("Approaching")
         # First offset - transformed to object frame
         local_offset1 = np.array([-0.030, 0, 0.015])  # In object frame
         world_offset1 = obj_rot @ local_offset1  # Transform to world frame
@@ -158,55 +200,56 @@ class MuJoCoRobot(Robot):
         off_rot = t3d.euler.euler2mat(0, 0, np.pi/2)
         new_rot = obj_rot @ off_rot
         rotated_pose = t3d.affines.compose(current_pos, new_rot, [1, 1, 1])
-        self.servo_to_pose(rotated_pose, lin_tol=0.003, ang_tol=0.05)
+        self.servo_to_pose(rotated_pose, lin_tol=0.003, ang_tol=0.1)
 
         # Second offset - in current gripper frame
         curr_pose = self.pose()
-        local_offset2 = np.array([0.008, 0, 0])  # In gripper frame
+        local_offset2 = np.array([0.013, 0, 0])  # In gripper frame
         world_offset2 = curr_pose[:3,:3] @ local_offset2
         current_pos = curr_pose[:3,3] + world_offset2
         rotated_pose = t3d.affines.compose(current_pos, curr_pose[:3,:3], [1, 1, 1])
-        self.servo_to_pose(rotated_pose, lin_tol=0.003, ang_tol=0.05)
+        self.servo_to_pose(rotated_pose, lin_tol=0.0015, ang_tol=0.1)
 
         # Third offset - in current gripper frame (Z-axis)
-        time.sleep(1)
         curr_pose = self.pose()
         local_offset3 = np.array([0, 0, 0.07])  # In gripper frame
         world_offset3 = curr_pose[:3,:3] @ local_offset3
         current_pos = curr_pose[:3,3] + world_offset3
         rotated_pose = t3d.affines.compose(current_pos, curr_pose[:3,:3], [1, 1, 1])
-        self.servo_to_pose(rotated_pose, lin_tol=0.001, ang_tol=0.05)
+        self.servo_to_pose(rotated_pose, lin_tol=0.0015, ang_tol=0.1)
         
         # Open gripper and lift - world Z-axis
         self.gripper_open()
-
+    
         current_pos = curr_pose[:3,3] + np.array([0, 0, 0.1])  # World frame
         rotated_pose = t3d.affines.compose(current_pos, curr_pose[:3,:3], [1, 1, 1])
-        self.servo_to_pose(rotated_pose, lin_tol=0.003, ang_tol=0.05)
-        self.model.opt.gravity[:]=[0,0,-9.81]
-        mj.mj_forward(self.model, self.data)
+        self.servo_to_pose(rotated_pose, lin_tol=0.003, ang_tol=0.1)
+        
         # Apply random rotation in object frame
         angle_x = np.random.uniform(-0.3, 0.3) 
         angle_y = np.random.uniform(-0.3, 0.3)   
         angle_z = np.random.uniform(-np.pi, np.pi)
-        random_rot = t3d.euler.euler2mat(np.pi/6 + angle_x,
-                                        np.pi/6 + angle_y,
-                                        np.pi/6 + angle_z)
+        random_rot = t3d.euler.euler2mat(np.pi/8 + angle_x,
+                                        np.pi/8 + angle_y,
+                                        np.pi/8 + angle_z)
         const_rot = np.array([[9.99996083e-01, -5.31966273e-07, -2.79879023e-03], [-5.40655149e-07, -1.00000000e+00, -3.10375475e-06], [-2.79879023e-03, 3.10525578e-06, -9.99996083e-01]])
         curr_pose = self.pose()
         new_rot = const_rot @ random_rot
-        rotated_pose = t3d.affines.compose(curr_pose[:3,3], new_rot, [1, 1, 1])
-        self.servo_to_pose(rotated_pose, lin_tol=0.003, ang_tol=0.05)
+        trans = np.array([0.25,np.random.uniform(-0.01,0.01),0.2])
+        print(f"Moved to {trans}")
+        rotated_pose = t3d.affines.compose(trans, new_rot, [1, 1, 1])
+        self.servo_to_pose(rotated_pose, lin_tol=0.003, ang_tol=0.1)
         
         # Final grasp and lift
         self.gripper_close()
+        self.model.opt.gravity[:]=[0,0,-9.81]
+        mj.mj_forward(self.model, self.data)
         self.stop_object_movement()
-        time.sleep(1)
         
         curr_obj_pose = self.get_object_pose()
-        current_pos = curr_obj_pose[:3,3] + np.array([0, 0, 0.4])  # World Z
+        current_pos = curr_obj_pose[:3,3] + np.array([0, 0, 0.2])  # World Z
         rotated_pose = t3d.affines.compose(current_pos, initial_rot, [1, 1, 1])
-        self.servo_to_pose(rotated_pose, lin_tol=0.003, ang_tol=0.05)
+        self.servo_to_pose(rotated_pose, lin_tol=0.003, ang_tol=0.1)
 
 
 
@@ -229,7 +272,7 @@ class MuJoCoRobot(Robot):
             self._set_gripper_position(0.0)
 
 
-    def _set_gripper_position(self, pos, tolerance=1e-3, max_sim_steps=5000): # Increased max_sim_steps for safety
+    def _set_gripper_position(self, pos, tolerance=1e-3, max_sim_steps=2000): # Increased max_sim_steps for safety
         target_pos = np.clip(pos, self.gripper_close_pos, self.gripper_open_pos)
         self.data.ctrl[self.gripper_ctrl_id] = target_pos
         steps_taken = 0
