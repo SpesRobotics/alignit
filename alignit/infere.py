@@ -22,7 +22,7 @@ def main():
     robot = MuJoCoRobot()
 
     start_pose = t3d.affines.compose(
-        [0.190, 0.1, 0.2], t3d.euler.euler2mat(np.pi, 0, 0), [1, 1, 1]
+        [0.330, 0, 0.35], t3d.euler.euler2mat(np.pi, 0, 0), [1, 1, 1]
     )
     robot.servo_to_pose(start_pose)
     total = 0
