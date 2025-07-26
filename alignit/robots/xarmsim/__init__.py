@@ -114,81 +114,6 @@ class XarmSim(Robot):
                 self.data.qvel[qvel_adr : qvel_adr + 6] = 0
         mj.mj_forward(self.model, self.data)
 
-    def reset_auto(self):
-        self.gripper_close()
-        self.model.opt.gravity[:] = [0, 0, 0]
-        obj_pose = self.get_object_pose("pickup_object")
-        initial_pose = self.pose()
-        initial_rot = initial_pose[:3, :3]
-        obj_pos = obj_pose[:3, 3]
-        obj_rot = obj_pose[:3, :3]
-        local_offset1 = np.array([0, 0, -0.15])
-        world_offset1 = obj_rot @ local_offset1
-        approach_pos = obj_pos + world_offset1
-        approach_pose = t3d.affines.compose(approach_pos, obj_rot, [1, 1, 1])
-        self.servo_to_pose(approach_pose, lin_tol=0.003, ang_tol=0.1)
-
-        print("Approaching")
-        local_offset1 = np.array([-0.030, 0, 0.015])  # In object frame
-        world_offset1 = obj_rot @ local_offset1  # Transform to world frame
-        current_pos = approach_pose[:3, 3] + world_offset1
-        off_rot = t3d.euler.euler2mat(0, 0, np.pi / 2)
-        new_rot = obj_rot @ off_rot
-        rotated_pose = t3d.affines.compose(current_pos, new_rot, [1, 1, 1])
-        self.servo_to_pose(rotated_pose, lin_tol=0.003, ang_tol=0.1)
-
-        curr_pose = self.pose()
-        local_offset2 = np.array([0.013, 0, 0])  # In gripper frame
-        world_offset2 = curr_pose[:3, :3] @ local_offset2
-        current_pos = curr_pose[:3, 3] + world_offset2
-        rotated_pose = t3d.affines.compose(current_pos, curr_pose[:3, :3], [1, 1, 1])
-        self.servo_to_pose(rotated_pose, lin_tol=0.0015, ang_tol=0.1)
-
-        curr_pose = self.pose()
-        local_offset3 = np.array([0, 0, 0.07])  # In gripper frame
-        world_offset3 = curr_pose[:3, :3] @ local_offset3
-        current_pos = curr_pose[:3, 3] + world_offset3
-        rotated_pose = t3d.affines.compose(current_pos, curr_pose[:3, :3], [1, 1, 1])
-        self.servo_to_pose(rotated_pose, lin_tol=0.0015, ang_tol=0.1)
-
-        self.gripper_open()
-
-        current_pos = curr_pose[:3, 3] + np.array([0, 0, 0.1])  # World frame
-        rotated_pose = t3d.affines.compose(current_pos, curr_pose[:3, :3], [1, 1, 1])
-        self.servo_to_pose(rotated_pose, lin_tol=0.003, ang_tol=0.1)
-
-        angle_x = np.random.uniform(-0.3, 0.3)
-        angle_y = np.random.uniform(-0.3, 0.3)
-        angle_z = np.random.uniform(-np.pi, np.pi)
-        random_rot = t3d.euler.euler2mat(
-            np.pi / 8 + angle_x, np.pi / 8 + angle_y, np.pi / 8 + angle_z
-        )
-        const_rot = np.array(
-            [
-                [9.99996083e-01, -5.31966273e-07, -2.79879023e-03],
-                [-5.40655149e-07, -1.00000000e00, -3.10375475e-06],
-                [-2.79879023e-03, 3.10525578e-06, -9.99996083e-01],
-            ]
-        )
-        curr_pose = self.pose()
-        new_rot = const_rot @ random_rot
-        trans = np.array([0.25, np.random.uniform(-0.01, 0.01), 0.2])
-
-        print(f"Moved to {trans}")
-        rotated_pose = t3d.affines.compose(trans, new_rot, [1, 1, 1])
-        self.servo_to_pose(rotated_pose, lin_tol=0.003, ang_tol=0.1)
-
-        # Final grasp and lift
-        self.gripper_close()
-        self.model.opt.gravity[:] = [0, 0, -9.81]
-        mj.mj_forward(self.model, self.data)
-        self.stop_object_movement()
-
-        curr_obj_pose = self.get_object_pose()
-        current_pos = curr_obj_pose[:3, 3] + np.array([0, 0, 0.2])  # World Z
-        rotated_pose = t3d.affines.compose(current_pos, initial_rot, [1, 1, 1])
-        self.servo_to_pose(rotated_pose, lin_tol=0.003, ang_tol=0.1)
-
     def update_sim(self):
         mj.mj_forward(self.model, self.data)
         self.viewer.sync()
@@ -213,12 +138,9 @@ class XarmSim(Robot):
             self.current_gripper_pos = target_pos
 
     def send_action(self, target_pose_matrix):
-        try:
-            base_pos = self.data.xpos[self.model.body("link_base").id]
-            base_rot = self.data.xmat[self.model.body("link_base").id].reshape(3, 3)
-            world_to_base = t3d.affines.compose(base_pos, base_rot, [1, 1, 1])
-        except KeyError:
-            world_to_base = np.eye(4)
+        base_pos = self.data.xpos[self.model.body("link_base").id]
+        base_rot = self.data.xmat[self.model.body("link_base").id].reshape(3, 3)
+        world_to_base = t3d.affines.compose(base_pos, base_rot, [1, 1, 1])
         base_target_pose = np.linalg.inv(world_to_base) @ target_pose_matrix
         servo_dt = self.model.opt.timestep
         self.robot_jacobi.servo_to_pose(base_target_pose, dt=servo_dt)

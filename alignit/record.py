@@ -96,7 +96,6 @@ def main():
     pose_record_start = pose_alignment_target @ t3d.affines.compose(
         [0.1, 0, -0.1], t3d.euler.euler2mat(0, 0, 0), [1, 1, 1]
     )
-    print("Current robot pose: ")
 
     for episode in range(20):
 
