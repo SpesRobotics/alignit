@@ -35,10 +35,9 @@ class XarmSim(Robot):
             print(f"Failed to load MuJoCo model from {mjcf_path}: {e}")
             raise RuntimeError(f"Failed to load MuJoCo model from {mjcf_path}: {e}")
 
+        self.renderer = mujoco.Renderer(self.model, 240, 320)
         self.viewer = mujoco.viewer.launch_passive(self.model, self.data)
 
-        self.cam = None
-        self.mjr_context = None
         self.robot_jacobi = JacobiRobot(
             str(urdf_path_jacobi), ee_link=end_effector_frame_name_jacobi
         )
@@ -252,28 +251,22 @@ class XarmSim(Robot):
         rot_mat = self.data.xmat[eef_id].reshape(3, 3)
         return t3d.affines.compose(pos, rot_mat, [1, 1, 1])
 
-    def get_observation(self, camera_name: str = "gripper_camera"):
-        if camera_name in [self.model.camera(i).name for i in range(self.model.ncam)]:
-            self.cam.type = mj.mjtCamera.mjCAMERA_FIXED
-            self.cam.fixedcamid = self.model.camera(camera_name).id
-        else:
-            self.cam.type = mj.mjtCamera.mjCAMERA_FREE
-            mj.mjv_defaultCamera(self.cam)
-
-        width, height = 320, 240
-        viewport = mj.MjrRect(0, 0, width, height)
-        rgb_data = np.zeros((height, width, 3), dtype=np.uint8)
-        depth_data = np.zeros((height, width), dtype=np.float32)
-
-        mj.mjr_render(viewport, self.scn, self.mjr_context)
-        mj.mjr_readPixels(rgb_data, depth_data, viewport, self.mjr_context)
-
-        return {
+    def get_observation(self):
+        obs = {
             "qpos": self.data.qpos.copy(),
             "qvel": self.data.qvel.copy(),
             "eef_pose": self.pose(),
-            "camera.rgb": np.flipud(rgb_data),
         }
+
+        for i in range(self.model.ncam):
+            name = mujoco.mj_id2name(
+                self.model, mujoco.mjtObj.mjOBJ_CAMERA, i
+            )
+            self.renderer.update_scene(self.data, camera=name)
+            image = self.renderer.render()
+            obs["camera." + name] = image[:, :, ::-1]
+
+        return obs
 
     def close(self):
         print("Closing MuJoCo resources.")
