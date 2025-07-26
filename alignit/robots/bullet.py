@@ -13,8 +13,11 @@ class Bullet(Robot):
         p.setGravity(0, 0, -9.81)
         self.plane = p.loadURDF("plane.urdf")
         self.robot = self._load_robot()
-        self.cube = self._load_object()
+        self.duck = self._load_object()
         self.camera_link = self._get_gripper_link()
+
+        self.duck_x_slider = p.addUserDebugParameter("Duck X", 0.2, 1.0, 0.6)
+        self.duck_y_slider = p.addUserDebugParameter("Duck Y", -0.5, 0.5, 0.0)
 
     def _load_robot(self):
         robot_urdf = "kuka_iiwa/model.urdf"
@@ -47,12 +50,20 @@ class Bullet(Robot):
         )
         return mesh
 
+    def update_duck_position(self):
+        x = p.readUserDebugParameter(self.duck_x_slider)
+        y = p.readUserDebugParameter(self.duck_y_slider)
+        p.resetBasePositionAndOrientation(
+            self.duck, [x, y, 0.05], p.getQuaternionFromEuler([0, 0, 0])
+        )
+
     def _get_gripper_link(self):
         return 6
 
     def send_action(self, action):
         self._servo(action)
         p.stepSimulation()
+        self.update_duck_position()
         time.sleep(1.0 / 240.0)
 
     def _servo(self, pose):
@@ -98,27 +109,16 @@ class Bullet(Robot):
         ]
         view_matrix = p.computeViewMatrix(cam_pos, target, up)
         proj_matrix = p.computeProjectionMatrixFOV(60, 1, 0.01, 2)
-        width, height, rgb_data, depth, segmentation = p.getCameraImage(320, 240, view_matrix, proj_matrix)
-        
-        
-        # Convert RGB data to proper numpy array
-        if isinstance(rgb_data, tuple):
-            # If we got a tuple of pixel values
-            rgb_array = np.array(rgb_data, dtype=np.uint8)
-            # Reshape to (height, width, channels)
-            rgb_array = rgb_array.reshape((height, width, -1))
-        else:
-            # If already an array (newer PyBullet versions)
-            rgb_array = rgb_data
-        
-        # Handle channel formats
-        if len(rgb_array.shape) == 2:  # Grayscale
-            rgb_array = np.stack([rgb_array]*3, axis=-1)  # Convert to RGB
-        elif rgb_array.shape[2] == 4:  # RGBA
-            rgb_array = rgb_array[:, :, :3]  # Remove alpha
-        
+        _, _, px, _, _ = p.getCameraImage(320, 240, view_matrix, proj_matrix)
+
+        # make sure px 3 channels, rgb, not rgba
+        if len(px.shape) == 2:
+            px = np.stack([px, px, px], axis=-1)
+        elif px.shape[2] == 4:
+            px = px[:, :, :3]
+
         return {
-            "camera.rgb": rgb_array  # Now guaranteed (H,W,3) uint8 array
+            "camera.rgb": px,
         }
 
     def close(self):
