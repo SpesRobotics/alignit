@@ -20,7 +20,7 @@ import os
 
 def generate_spiral_trajectory(
     start_pose,
-    z_step=0.001,
+    z_step=0.1,
     radius_step=0.001,
     num_steps=100,
     cone_angle=45,
@@ -29,108 +29,83 @@ def generate_spiral_trajectory(
     angular_resolution=5,
     include_cone_poses=True,
     initial_lift_steps=10,
-    lift_height_before_spiral=0.1,
+    lift_height_before_spiral=0.01
 ):
-
     trajectory = []
     R_start = start_pose[:3, :3]
     t_start_initial = start_pose[:3, 3]
-
+    
     cone_angle_rad = np.deg2rad(cone_angle)
-    t_start_spiral = np.array(
-        [
-            t_start_initial[0],
-            t_start_initial[1],
-            t_start_initial[2] + lift_height_before_spiral,
-        ]
-    )
+    
+    # Extract the object's Z-axis (third column of rotation matrix)
+    object_z_axis = R_start[:, 2]  # This is the object's local Z-axis in world coordinates
+    
+    # Lift along the object's Z-axis instead of world Z-axis
+    lift_offset_world = object_z_axis * lift_height_before_spiral
+    t_start_spiral = t_start_initial + lift_offset_world
+    
     start_angle = -visible_sweep / 2 + viewing_angle_offset
     end_angle = visible_sweep / 2 + viewing_angle_offset
-
+    
     for i in range(num_steps):
         radius = radius_step * i
         angle = 2 * np.pi * i / 10
-        local_offset = np.array(
-            [radius * np.cos(angle), radius * np.sin(angle), -z_step * i]
-        )
-
+        
+        # Define spiral offset in the object's local coordinate system
+        local_offset = np.array([
+            radius * np.cos(angle),
+            radius * np.sin(angle),
+            -z_step * i  # This moves down in the object's local Z
+        ])
+        
+        # Transform the local offset to world coordinates
         world_offset = R_start @ local_offset
         base_position = t_start_spiral + world_offset
-
+        
         T = np.eye(4)
         T[:3, :3] = R_start
         T[:3, 3] = base_position
         trajectory.append(T)
-
+        
         if include_cone_poses:
             for deg in np.arange(start_angle, end_angle, angular_resolution):
                 theta = np.deg2rad(deg)
-
+                
                 tilt = t3d.euler.euler2mat(cone_angle_rad, 0, 0)
                 spin = t3d.euler.euler2mat(0, 0, theta)
                 R_cone = R_start @ spin @ tilt
-
+                
                 T_cone = np.eye(4)
                 T_cone[:3, :3] = R_cone
                 T_cone[:3, 3] = base_position
                 trajectory.append(T_cone)
-
+    
     return trajectory
 
 
 def main():
     robot = XarmSim()
-    features = Features(
-        {"images": Sequence(Image()), "action": Sequence(Value("float32"))}
-    )
 
     pose1 = robot.get_object_pose()
-    transl = pose1[:3, 3] + np.array([0, 0, 0.1])
-    rot = pose1[:3, :3]
-
-    pose_final_target = t3d.affines.compose(transl, rot, [1, 1, 1])
-
+    pose_final_target = t3d.affines.compose(pose1[:3, 3] + np.array([0, 0, 0.1]), pose1[:3, :3], [1, 1, 1])
     pose_alignment_target = pose_final_target @ t3d.affines.compose(
         [0.0, 0, -0.15], t3d.euler.euler2mat(0, 0, 0), [1, 1, 1]
     )
-    pose_record_start = pose_alignment_target @ t3d.affines.compose(
-        [0.1, 0, -0.1], t3d.euler.euler2mat(0, 0, 0), [1, 1, 1]
-    )
 
     for episode in range(20):
-
-        random_pos = [
-            0.25 + np.random.uniform(-0.01, 0.01),
-            0.0 + np.random.uniform(-0.01, 0.01),
-            0.08,
-        ]
-        roll = np.pi
-        pitch = np.random.uniform(0, np.pi / 4)
-        yaw = np.random.uniform(-np.pi / 2, np.pi / 2)
-
-        pose = t3d.affines.compose(
-            random_pos, t3d.euler.euler2mat(roll, pitch, yaw), [1, 1, 1]  #
+        robot.reset()
+        pose1 = robot.get_object_pose()
+        pose_start = pose1 @ t3d.affines.compose(
+            [0, 0, -0.060], t3d.euler.euler2mat(0, 0, 0), [1, 1, 1]
         )
-        pose_alignment_target = pose @ t3d.affines.compose(
+        pose_alignment_target = pose1 @ t3d.affines.compose(
             [0, 0, -0.1], t3d.euler.euler2mat(0, 0, 0), [1, 1, 1]
         )
-        pose_start = pose @ t3d.affines.compose(
-            [0, 0, -0.025], t3d.euler.euler2mat(0, 0, 0), [1, 1, 1]
-        )
-        robot.set_object_pose("pickup_object", pose)
-        pose1 = robot.get_object_pose()
-        object_z_axis = pose1[:3, 2]
-        offset_distance = -0.1
-        offset_vector = object_z_axis * offset_distance
-        transl = pose1[:3, 3] + offset_vector
-        rot = pose1[:3, :3]
-        pose_final_target = t3d.affines.compose(transl, rot, [1, 1, 1])
 
         robot.servo_to_pose(pose_alignment_target, lin_tol=0.015, ang_tol=0.015)
-        robot.groff()
         trajectory = generate_spiral_trajectory(
             pose_start,
-            z_step=0.0005,
+            z_step=0.0007,
             radius_step=0.001,
             num_steps=100,
             cone_angle=30,
@@ -162,20 +137,20 @@ def main():
 
         print(f"Episode {episode+1} completed with {len(frames)} frames.")
 
-        episode_dataset = Dataset.from_list(frames, features=features)
-        if episode == 0:
-            combined_dataset = episode_dataset
-        else:
-            previous_dataset = load_from_disk("data/duck")
-            previous_dataset = previous_dataset.cast(features)
-            combined_dataset = concatenate_datasets([previous_dataset, episode_dataset])
-            del previous_dataset
+        # episode_dataset = Dataset.from_list(frames, features=features)
+        # if episode == 0:
+        #     combined_dataset = episode_dataset
+        # else:
+        #     previous_dataset = load_from_disk("data/duck")
+        #     previous_dataset = previous_dataset.cast(features)
+        #     combined_dataset = concatenate_datasets([previous_dataset, episode_dataset])
+        #     del previous_dataset
 
-        temp_path = "data/duck_temp"
-        combined_dataset.save_to_disk(temp_path)
-        if os.path.exists("data/duck"):
-            shutil.rmtree("data/duck")
-        shutil.move(temp_path, "data/duck")
+        # temp_path = "data/duck_temp"
+        # combined_dataset.save_to_disk(temp_path)
+        # if os.path.exists("data/duck"):
+        #     shutil.rmtree("data/duck")
+        # shutil.move(temp_path, "data/duck")
 
     robot.close()
 

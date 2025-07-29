@@ -95,6 +95,21 @@ class XarmSim(Robot):
     def groff(self):
         self.model.opt.gravity[:] = [0, 0, 0]
         mj.mj_forward(self.model, self.data)
+    def reset(self):
+        self.groff()
+        random_pos = [
+            0.25 + np.random.uniform(-0.01, 0.01),
+            0.0 + np.random.uniform(-0.01, 0.01),
+            0.08,
+        ]
+        roll = np.pi
+        pitch = np.random.uniform(0, np.pi / 4)
+        yaw = np.random.uniform(-np.pi / 2, np.pi / 2)
+
+        pose = t3d.affines.compose(
+            random_pos, t3d.euler.euler2mat(roll, pitch, yaw), [1, 1, 1]  #
+        )    
+        self.set_object_pose("pickup_object", pose)
 
     def set_object_pose(self, object_name, pose_matrix):
         body_id = self.model.body(object_name).id
