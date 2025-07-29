@@ -1,6 +1,7 @@
 import numpy as np
 import transforms3d as t3d
 from alignit.robots.xarmsim import XarmSim
+from alignit.robots.xarm import Xarm
 from datasets import (
     Dataset,
     Features,
@@ -74,7 +75,7 @@ def generate_spiral_trajectory(
 
 
 def main():
-    robot = XarmSim()
+    robot = Xarm()
     features = Features(
         {"images": Sequence(Image()), "action": Sequence(Value("float32"))}
     )

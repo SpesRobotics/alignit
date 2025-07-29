@@ -1,9 +1,15 @@
 from lerobot.cameras.realsense import RealSenseCamera, RealSenseCameraConfig
 from lerobot_xarm.xarm import Xarm as LeXarm
 from lerobot_xarm.config import XarmConfig
+from alignit.robots.robot import Robot
+import numpy as np
+import transforms3d as t3d
+import math
+from transforms3d import euler
+from alignit.utils.tfs import are_tfs_close
 
 
-class Xarm:
+class Xarm(Robot):
     def __init__(self):
         config = RealSenseCameraConfig(
             serial_number_or_name="021222071076",
@@ -12,17 +18,14 @@ class Xarm:
 
         robot_config = XarmConfig()
         self.robot = LeXarm(robot_config)
+        self._connect()
 
-    def connect(self):
+    def _connect(self):
         self.camera.connect()
         self.robot.connect()
 
 
-    def send_action(self, pose):
-        action = {
-            "pose": pose,
-            "gripper.pos": 0.0,
-        }
+    def send_action(self, action):
         self.robot.send_action(action)
 
     def get_observation(self):
@@ -34,12 +37,76 @@ class Xarm:
 
     def disconnect(self):
         self.camera.disconnect()
+    def servo_to_pose(self, pose, lin_tol=1e-3, ang_tol=1e-2):
+        while not are_tfs_close(self.pose(), pose, lin_tol, ang_tol):
+            action = {
+                "pose": pose,
+                "gripper.pos": 1.0  # Optional: set gripper state (0.0=closed, 1.0=open)
+            }
+            self.send_action(action)
+    def reset(self):
+        """
+        Reset routine:
+        1. Allows manual movement of the arm
+        2. Waits for user input (Enter key)
+        3. Applies gripper-frame Z offset
+        4. Applies world-frame Z offset
+        5. Returns to normal operation
+        
+        Args:
+            manual_height: Height above surface to maintain during manual movement (meters)
+            world_z_offset: Additional Z offset in world frame after manual positioning (meters)
+        """
+        manual_height=0.05
+        world_z_offset=0.02
+        input("Press Enter after positioning the arm...")
+        current_pose = self.pose()
+        gripper_z_offset = np.array([[1, 0, 0, 0],
+                                    [0, 1, 0, 0],
+                                    [0, 0, 1, manual_height],
+                                    [0, 0, 0, 1]])
+        offset_pose = current_pose @ gripper_z_offset
+        self.send_action(offset_pose)
+        
+        world_z_offset_mat = np.array([[1, 0, 0, 0],
+                                        [0, 1, 0, 0],
+                                    [0, 0, 1, world_z_offset],
+                                    [0, 0, 0, 1]])
+        final_pose = offset_pose @ world_z_offset_mat
+        self.send_action(final_pose)
+
+        pose_start = current_pose @ t3d.affines.compose(
+            [0, 0, -0.060], t3d.euler.euler2mat(0, 0, 0), [1, 1, 1]
+        )
+        pose_alignment_target = current_pose @ t3d.affines.compose(
+            [0, 0, -0.1], t3d.euler.euler2mat(0, 0, 0), [1, 1, 1]
+        )
+        return pose_start, pose_alignment_target
+    
+    def pose(self):
+        ok, pose = self.robot._arm.get_position()
+        if ok != 0:
+            return None
+
+        translation = np.array(pose[:3]) / 1000
+        eulers = np.array(pose[3:]) * math.pi / 180
+        rotation = euler.euler2mat(
+            eulers[0], eulers[1], eulers[2], 'sxyz')
+        pose = t3d.affines.compose(translation, rotation, np.ones(3))
+        print("Retrieved robot pose.")
+        return pose
+
 
 
 if __name__ == "__main__":
     xarm = Xarm()
-    xarm.connect()
     obs = xarm.get_observation()
+    pose_matrix = np.eye(4)
+    translation = [0.320, 0, 0.130]
+    rotation = t3d.euler.euler2mat(0, 3.14, 0)  # 45 degrees around Z
+    pose_matrix = t3d.affines.compose(translation, rotation, [1, 1, 1])
+
+    xarm.servo_to_pose(pose=pose_matrix, lin_tol=1e-3, ang_tol=1e-2)
 
     print("Observation:")
     print("RGB Image:", obs["rgb"])
