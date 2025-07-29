@@ -110,6 +110,14 @@ class XarmSim(Robot):
             random_pos, t3d.euler.euler2mat(roll, pitch, yaw), [1, 1, 1]  #
         )    
         self.set_object_pose("pickup_object", pose)
+        pose1 = self.get_object_pose()
+        pose_start = pose1 @ t3d.affines.compose(
+            [0, 0, -0.060], t3d.euler.euler2mat(0, 0, 0), [1, 1, 1]
+        )
+        pose_alignment_target = pose1 @ t3d.affines.compose(
+            [0, 0, -0.1], t3d.euler.euler2mat(0, 0, 0), [1, 1, 1]
+        )
+        return pose_start, pose_alignment_target
 
     def set_object_pose(self, object_name, pose_matrix):
         body_id = self.model.body(object_name).id

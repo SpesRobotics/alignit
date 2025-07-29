@@ -2,6 +2,7 @@ import time
 import numpy as np
 import transforms3d as t3d
 from alignit.robots.bullet import Bullet
+from alignit.robots.xarmtable import XarmTable
 from alignit.robots.xarmsim import XarmSim
 from alignit.utils.tfs import are_tfs_close
 from datasets import (
@@ -13,9 +14,10 @@ from datasets import (
     load_from_disk,
     concatenate_datasets,
 )
-from alignit.utils.zhou import se3_sixd
-import shutil
 import os
+import shutil
+from alignit.utils.zhou import se3_sixd
+
 
 
 def generate_spiral_trajectory(
@@ -37,10 +39,8 @@ def generate_spiral_trajectory(
     
     cone_angle_rad = np.deg2rad(cone_angle)
     
-    # Extract the object's Z-axis (third column of rotation matrix)
-    object_z_axis = R_start[:, 2]  # This is the object's local Z-axis in world coordinates
+    object_z_axis = R_start[:, 2]  
     
-    # Lift along the object's Z-axis instead of world Z-axis
     lift_offset_world = object_z_axis * lift_height_before_spiral
     t_start_spiral = t_start_initial + lift_offset_world
     
@@ -51,14 +51,12 @@ def generate_spiral_trajectory(
         radius = radius_step * i
         angle = 2 * np.pi * i / 10
         
-        # Define spiral offset in the object's local coordinate system
         local_offset = np.array([
             radius * np.cos(angle),
             radius * np.sin(angle),
-            -z_step * i  # This moves down in the object's local Z
+            -z_step * i  
         ])
         
-        # Transform the local offset to world coordinates
         world_offset = R_start @ local_offset
         base_position = t_start_spiral + world_offset
         
@@ -85,24 +83,15 @@ def generate_spiral_trajectory(
 
 def main():
     robot = XarmSim()
-
-    pose1 = robot.get_object_pose()
-    pose_final_target = t3d.affines.compose(pose1[:3, 3] + np.array([0, 0, 0.1]), pose1[:3, :3], [1, 1, 1])
-    pose_alignment_target = pose_final_target @ t3d.affines.compose(
-        [0.0, 0, -0.15], t3d.euler.euler2mat(0, 0, 0), [1, 1, 1]
+    features = Features(
+        {"images": Sequence(Image()), "action": Sequence(Value("float32"))}
     )
-
     for episode in range(20):
-        robot.reset()
-        pose1 = robot.get_object_pose()
-        pose_start = pose1 @ t3d.affines.compose(
-            [0, 0, -0.060], t3d.euler.euler2mat(0, 0, 0), [1, 1, 1]
-        )
-        pose_alignment_target = pose1 @ t3d.affines.compose(
-            [0, 0, -0.1], t3d.euler.euler2mat(0, 0, 0), [1, 1, 1]
-        )
+
+        pose_start, pose_alignment_target = robot.reset()
 
         robot.servo_to_pose(pose_alignment_target, lin_tol=0.015, ang_tol=0.015)
+
         trajectory = generate_spiral_trajectory(
             pose_start,
             z_step=0.0007,
@@ -114,13 +103,8 @@ def main():
             angular_resolution=10,
             include_cone_poses=False,
         )
-        i = 0
-        for pose in trajectory:
-            print(f"Pose number {i}: {pose}")
-            i = i + 1
         frames = []
         i = 0
-        # robot.servo_to_pose(pose_record_start)
         for pose in trajectory:
             robot.servo_to_pose(pose, lin_tol=0.05, ang_tol=0.05)
             current_pose = robot.pose()
@@ -131,28 +115,26 @@ def main():
             observation = robot.get_observation()
             frame = {"images": [observation["camera.rgb"]], "action": action_sixd}
             frames.append(frame)
-            print(f"moved to {pose}")
-            i = i + 1
-            print(f"Completed : {i} %")
 
         print(f"Episode {episode+1} completed with {len(frames)} frames.")
 
-        # episode_dataset = Dataset.from_list(frames, features=features)
-        # if episode == 0:
-        #     combined_dataset = episode_dataset
-        # else:
-        #     previous_dataset = load_from_disk("data/duck")
-        #     previous_dataset = previous_dataset.cast(features)
-        #     combined_dataset = concatenate_datasets([previous_dataset, episode_dataset])
-        #     del previous_dataset
+        episode_dataset = Dataset.from_list(frames, features=features)
+        if episode == 0:
+            combined_dataset = episode_dataset
+        else:
+            previous_dataset = load_from_disk("data/duck")
+            previous_dataset = previous_dataset.cast(features)
+            combined_dataset = concatenate_datasets([previous_dataset, episode_dataset])
+            del previous_dataset
 
-        # temp_path = "data/duck_temp"
-        # combined_dataset.save_to_disk(temp_path)
-        # if os.path.exists("data/duck"):
-        #     shutil.rmtree("data/duck")
-        # shutil.move(temp_path, "data/duck")
+        temp_path = "data/duck_temp"
+        combined_dataset.save_to_disk(temp_path)
+        if os.path.exists("data/duck"):
+            shutil.rmtree("data/duck")
+        shutil.move(temp_path, "data/duck")
 
     robot.close()
+
 
 
 if __name__ == "__main__":
