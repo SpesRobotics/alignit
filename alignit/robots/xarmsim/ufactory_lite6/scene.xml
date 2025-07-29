@@ -1,0 +1,349 @@
+<mujoco model="lite6 scene">
+  <include file="lite6_gripper_narrow.xml"/>
+
+  <statistic center="0 0 0.3" extent="0.6"/>
+
+  <visual>
+    <headlight diffuse="0.6 0.6 0.6" ambient="0.3 0.3 0.3" specular="0 0 0"/>
+    <rgba haze="0.15 0.25 0.35 1"/>
+    <global azimuth="120" elevation="-20"/>
+  </visual>
+
+  <asset>
+    <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.7" rgb2="0 0 0" width="512" height="3072"/>
+    <texture type="2d" name="groundplane" builtin="checker" mark="edge" rgb1="0.2 0.3 0.4" rgb2="0.1 0.2 0.3"
+             markrgb="0.8 0.8 0.8" width="300" height="300"/>
+    <material name="groundplane" texture="groundplane" texuniform="true" texrepeat="5 5" reflectance="0.2"/>
+    
+    <mesh name="object_mesh_visual" file="StatorSimplified.stl" scale="0.001 0.001 0.001" />
+    <material name="object_material" rgba="0.8 0.2 0.2 1"/>
+
+    <mesh name="stator_collision_part_000" file="collision_parts/stator/stator_part_000.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_001" file="collision_parts/stator/stator_part_001.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_002" file="collision_parts/stator/stator_part_002.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_003" file="collision_parts/stator/stator_part_003.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_004" file="collision_parts/stator/stator_part_004.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_005" file="collision_parts/stator/stator_part_005.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_006" file="collision_parts/stator/stator_part_006.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_007" file="collision_parts/stator/stator_part_007.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_008" file="collision_parts/stator/stator_part_008.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_009" file="collision_parts/stator/stator_part_009.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_010" file="collision_parts/stator/stator_part_010.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_011" file="collision_parts/stator/stator_part_011.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_012" file="collision_parts/stator/stator_part_012.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_013" file="collision_parts/stator/stator_part_013.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_014" file="collision_parts/stator/stator_part_014.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_015" file="collision_parts/stator/stator_part_015.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_016" file="collision_parts/stator/stator_part_016.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_017" file="collision_parts/stator/stator_part_017.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_018" file="collision_parts/stator/stator_part_018.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_019" file="collision_parts/stator/stator_part_019.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_020" file="collision_parts/stator/stator_part_020.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_021" file="collision_parts/stator/stator_part_021.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_022" file="collision_parts/stator/stator_part_022.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_023" file="collision_parts/stator/stator_part_023.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_024" file="collision_parts/stator/stator_part_024.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_025" file="collision_parts/stator/stator_part_025.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_026" file="collision_parts/stator/stator_part_026.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_027" file="collision_parts/stator/stator_part_027.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_028" file="collision_parts/stator/stator_part_028.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_029" file="collision_parts/stator/stator_part_029.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_030" file="collision_parts/stator/stator_part_030.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_031" file="collision_parts/stator/stator_part_031.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_032" file="collision_parts/stator/stator_part_032.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_033" file="collision_parts/stator/stator_part_033.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_034" file="collision_parts/stator/stator_part_034.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_035" file="collision_parts/stator/stator_part_035.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_036" file="collision_parts/stator/stator_part_036.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_037" file="collision_parts/stator/stator_part_037.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_038" file="collision_parts/stator/stator_part_038.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_039" file="collision_parts/stator/stator_part_039.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_040" file="collision_parts/stator/stator_part_040.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_041" file="collision_parts/stator/stator_part_041.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_042" file="collision_parts/stator/stator_part_042.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_043" file="collision_parts/stator/stator_part_043.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_044" file="collision_parts/stator/stator_part_044.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_045" file="collision_parts/stator/stator_part_045.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_046" file="collision_parts/stator/stator_part_046.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_047" file="collision_parts/stator/stator_part_047.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_048" file="collision_parts/stator/stator_part_048.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_049" file="collision_parts/stator/stator_part_049.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_050" file="collision_parts/stator/stator_part_050.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_051" file="collision_parts/stator/stator_part_051.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_052" file="collision_parts/stator/stator_part_052.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_053" file="collision_parts/stator/stator_part_053.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_054" file="collision_parts/stator/stator_part_054.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_055" file="collision_parts/stator/stator_part_055.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_056" file="collision_parts/stator/stator_part_056.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_057" file="collision_parts/stator/stator_part_057.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_058" file="collision_parts/stator/stator_part_058.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_059" file="collision_parts/stator/stator_part_059.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_060" file="collision_parts/stator/stator_part_060.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_061" file="collision_parts/stator/stator_part_061.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_062" file="collision_parts/stator/stator_part_062.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_063" file="collision_parts/stator/stator_part_063.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_064" file="collision_parts/stator/stator_part_064.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_065" file="collision_parts/stator/stator_part_065.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_066" file="collision_parts/stator/stator_part_066.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_067" file="collision_parts/stator/stator_part_067.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_068" file="collision_parts/stator/stator_part_068.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_069" file="collision_parts/stator/stator_part_069.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_070" file="collision_parts/stator/stator_part_070.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_071" file="collision_parts/stator/stator_part_071.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_072" file="collision_parts/stator/stator_part_072.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_073" file="collision_parts/stator/stator_part_073.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_074" file="collision_parts/stator/stator_part_074.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_075" file="collision_parts/stator/stator_part_075.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_076" file="collision_parts/stator/stator_part_076.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="stator_collision_part_077" file="collision_parts/stator/stator_part_077.stl" scale="0.001 0.001 0.001"/>
+
+  </asset>
+
+  <worldbody>
+    <light pos="0 0 1.5" dir="0 0 -1" directional="true"/>
+    <geom name="floor" size="0 0 0.05" type="plane" material="groundplane"/>
+    
+    <body name="pickup_object" pos="0.250 0 0.06" euler="3.14 0 0">
+      <joint type="free"/>  
+      <inertial pos="0 0 0" mass="0.5" diaginertia="0.001 0.001 0.001"/>
+      
+      <geom name="object_visual" type="mesh" mesh="object_mesh_visual" material="object_material" 
+            contype="0" conaffinity="0" group="2"/>
+            
+      <geom name="object_collision_part_000" type="mesh" mesh="stator_collision_part_000" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_001" type="mesh" mesh="stator_collision_part_001" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_002" type="mesh" mesh="stator_collision_part_002" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_003" type="mesh" mesh="stator_collision_part_003" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_004" type="mesh" mesh="stator_collision_part_004" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_005" type="mesh" mesh="stator_collision_part_005" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_006" type="mesh" mesh="stator_collision_part_006" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_007" type="mesh" mesh="stator_collision_part_007" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_008" type="mesh" mesh="stator_collision_part_008" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_009" type="mesh" mesh="stator_collision_part_009" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_010" type="mesh" mesh="stator_collision_part_010" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_011" type="mesh" mesh="stator_collision_part_011" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_012" type="mesh" mesh="stator_collision_part_012" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_013" type="mesh" mesh="stator_collision_part_013" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_014" type="mesh" mesh="stator_collision_part_014" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_015" type="mesh" mesh="stator_collision_part_015" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_016" type="mesh" mesh="stator_collision_part_016" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_017" type="mesh" mesh="stator_collision_part_017" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_018" type="mesh" mesh="stator_collision_part_018" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_019" type="mesh" mesh="stator_collision_part_019" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_020" type="mesh" mesh="stator_collision_part_020" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_021" type="mesh" mesh="stator_collision_part_021" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_022" type="mesh" mesh="stator_collision_part_022" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_023" type="mesh" mesh="stator_collision_part_023" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_024" type="mesh" mesh="stator_collision_part_024" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_025" type="mesh" mesh="stator_collision_part_025" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_026" type="mesh" mesh="stator_collision_part_026" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_027" type="mesh" mesh="stator_collision_part_027" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_028" type="mesh" mesh="stator_collision_part_028" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_029" type="mesh" mesh="stator_collision_part_029" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_030" type="mesh" mesh="stator_collision_part_030" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_031" type="mesh" mesh="stator_collision_part_031" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_032" type="mesh" mesh="stator_collision_part_032" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_033" type="mesh" mesh="stator_collision_part_033" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_034" type="mesh" mesh="stator_collision_part_034" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_035" type="mesh" mesh="stator_collision_part_035" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_036" type="mesh" mesh="stator_collision_part_036" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_037" type="mesh" mesh="stator_collision_part_037" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_038" type="mesh" mesh="stator_collision_part_038" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_039" type="mesh" mesh="stator_collision_part_039" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_040" type="mesh" mesh="stator_collision_part_040" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_041" type="mesh" mesh="stator_collision_part_041" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_042" type="mesh" mesh="stator_collision_part_042" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_043" type="mesh" mesh="stator_collision_part_043" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_044" type="mesh" mesh="stator_collision_part_044" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_045" type="mesh" mesh="stator_collision_part_045" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_046" type="mesh" mesh="stator_collision_part_046" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_047" type="mesh" mesh="stator_collision_part_047" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_048" type="mesh" mesh="stator_collision_part_048" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_049" type="mesh" mesh="stator_collision_part_049" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_050" type="mesh" mesh="stator_collision_part_050" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_051" type="mesh" mesh="stator_collision_part_051" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_052" type="mesh" mesh="stator_collision_part_052" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_053" type="mesh" mesh="stator_collision_part_053" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_054" type="mesh" mesh="stator_collision_part_054" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_055" type="mesh" mesh="stator_collision_part_055" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_056" type="mesh" mesh="stator_collision_part_056" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_057" type="mesh" mesh="stator_collision_part_057" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_058" type="mesh" mesh="stator_collision_part_058" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_059" type="mesh" mesh="stator_collision_part_059" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_060" type="mesh" mesh="stator_collision_part_060" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_061" type="mesh" mesh="stator_collision_part_061" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_062" type="mesh" mesh="stator_collision_part_062" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_063" type="mesh" mesh="stator_collision_part_063" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_064" type="mesh" mesh="stator_collision_part_064" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_065" type="mesh" mesh="stator_collision_part_065" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_066" type="mesh" mesh="stator_collision_part_066" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_067" type="mesh" mesh="stator_collision_part_067" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_068" type="mesh" mesh="stator_collision_part_068" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_069" type="mesh" mesh="stator_collision_part_069" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_070" type="mesh" mesh="stator_collision_part_070" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_071" type="mesh" mesh="stator_collision_part_071" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_072" type="mesh" mesh="stator_collision_part_072" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_073" type="mesh" mesh="stator_collision_part_073" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_074" type="mesh" mesh="stator_collision_part_074" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_075" type="mesh" mesh="stator_collision_part_075" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_076" type="mesh" mesh="stator_collision_part_076" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+      <geom name="object_collision_part_077" type="mesh" mesh="stator_collision_part_077" 
+            contype="1" conaffinity="1" group="3" solimp="0.9 0.95 0.001" solref="0.02 0"  
+            friction="0.7 0.3 0.1" margin="0.001" mass="0"/>
+    </body>
+  </worldbody>
+</mujoco>

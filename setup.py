@@ -16,6 +16,11 @@ setup(
         "transforms3d",
         "pybullet",
         "tqdm",
+        "matplotlib",
+        "mujoco",
+        "numpy",
+        "teleop[utils]",
+        "xarm-python-sdk",
     ],
     python_requires=">=3.7",
     classifiers=[

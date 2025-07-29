@@ -11,6 +11,8 @@ class Robot:
     def get_observation(self) -> dict:
         raise NotImplementedError("This method should be overridden by subclasses.")
         
-    def servo_to_pose(self, pose, lin_tol=1e-1, ang_tol=1e-1):
+    def servo_to_pose(self, pose, lin_tol=1e-3, ang_tol=1e-2):
         while not are_tfs_close(self.pose(), pose, lin_tol, ang_tol):
             self.send_action(pose)
+
+        
