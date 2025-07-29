@@ -123,7 +123,29 @@ class XarmSim(Robot):
 
     def gripper_open(self):
         self._set_gripper_position(self.gripper_open_pos)
+    def reset(self):
+        self.groff()
+        random_pos = [
+            0.25 + np.random.uniform(-0.01, 0.01),
+            0.0 + np.random.uniform(-0.01, 0.01),
+            0.08,
+        ]
+        roll = np.pi
+        pitch = np.random.uniform(0, np.pi / 4)
+        yaw = np.random.uniform(-np.pi / 2, np.pi / 2)
 
+        pose = t3d.affines.compose(
+            random_pos, t3d.euler.euler2mat(roll, pitch, yaw), [1, 1, 1]  #
+        )    
+        self.set_object_pose("pickup_object", pose)
+        pose1 = self.get_object_pose()
+        pose_start = pose1 @ t3d.affines.compose(
+            [0, 0, -0.060], t3d.euler.euler2mat(0, 0, 0), [1, 1, 1]
+        )
+        pose_alignment_target = pose1 @ t3d.affines.compose(
+            [0, 0, -0.1], t3d.euler.euler2mat(0, 0, 0), [1, 1, 1]
+        )
+        return pose_start, pose_alignment_target
     def _set_gripper_position(self, pos, tolerance=1e-3, max_sim_steps=2000):
         target_pos = np.clip(pos, self.gripper_close_pos, self.gripper_open_pos)
         self.data.ctrl[self.gripper_ctrl_id] = target_pos
