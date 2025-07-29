@@ -1,10 +1,6 @@
-import time
 import numpy as np
 import transforms3d as t3d
-from alignit.robots.bullet import Bullet
-from alignit.robots.xarmtable import XarmTable
 from alignit.robots.xarmsim import XarmSim
-from alignit.utils.tfs import are_tfs_close
 from datasets import (
     Dataset,
     Features,
@@ -19,7 +15,6 @@ import shutil
 from alignit.utils.zhou import se3_sixd
 
 
-
 def generate_spiral_trajectory(
     start_pose,
     z_step=0.1,
@@ -30,54 +25,51 @@ def generate_spiral_trajectory(
     viewing_angle_offset=0,
     angular_resolution=5,
     include_cone_poses=True,
-    initial_lift_steps=10,
-    lift_height_before_spiral=0.01
+    lift_height_before_spiral=0.01,
 ):
     trajectory = []
     R_start = start_pose[:3, :3]
     t_start_initial = start_pose[:3, 3]
-    
+
     cone_angle_rad = np.deg2rad(cone_angle)
-    
-    object_z_axis = R_start[:, 2]  
-    
+
+    object_z_axis = R_start[:, 2]
+
     lift_offset_world = object_z_axis * lift_height_before_spiral
     t_start_spiral = t_start_initial + lift_offset_world
-    
+
     start_angle = -visible_sweep / 2 + viewing_angle_offset
     end_angle = visible_sweep / 2 + viewing_angle_offset
-    
+
     for i in range(num_steps):
         radius = radius_step * i
         angle = 2 * np.pi * i / 10
-        
-        local_offset = np.array([
-            radius * np.cos(angle),
-            radius * np.sin(angle),
-            -z_step * i  
-        ])
-        
+
+        local_offset = np.array(
+            [radius * np.cos(angle), radius * np.sin(angle), -z_step * i]
+        )
+
         world_offset = R_start @ local_offset
         base_position = t_start_spiral + world_offset
-        
+
         T = np.eye(4)
         T[:3, :3] = R_start
         T[:3, 3] = base_position
         trajectory.append(T)
-        
+
         if include_cone_poses:
             for deg in np.arange(start_angle, end_angle, angular_resolution):
                 theta = np.deg2rad(deg)
-                
+
                 tilt = t3d.euler.euler2mat(cone_angle_rad, 0, 0)
                 spin = t3d.euler.euler2mat(0, 0, theta)
                 R_cone = R_start @ spin @ tilt
-                
+
                 T_cone = np.eye(4)
                 T_cone[:3, :3] = R_cone
                 T_cone[:3, 3] = base_position
                 trajectory.append(T_cone)
-    
+
     return trajectory
 
 
@@ -104,7 +96,6 @@ def main():
             include_cone_poses=False,
         )
         frames = []
-        i = 0
         for pose in trajectory:
             robot.servo_to_pose(pose, lin_tol=0.05, ang_tol=0.05)
             current_pose = robot.pose()
@@ -134,7 +125,6 @@ def main():
         shutil.move(temp_path, "data/duck")
 
     robot.close()
-
 
 
 if __name__ == "__main__":

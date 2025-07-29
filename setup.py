@@ -20,6 +20,7 @@ setup(
         "mujoco",
         "numpy",
         "teleop[utils]",
+        "xarm-python-sdk",
     ],
     python_requires=">=3.7",
     classifiers=[

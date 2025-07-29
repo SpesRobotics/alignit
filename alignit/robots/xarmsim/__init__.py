@@ -78,25 +78,13 @@ class XarmSim(Robot):
         mj.mj_resetData(self.model, self.data)
         mj.mj_forward(self.model, self.data)
         self.viewer.sync()
-        time.sleep(1.0)
 
-    def stop_object_movement(self, object_name="pickup_object"):
-        while self.data.body("pickup_object").xpos[2] > 0.08:
-            mj.mj_step(self.model, self.data)
-            self.viewer.sync()
-        self.model.opt.gravity[:] = [0, 0, 0]
-        obj_id = self.model.body(object_name).id
-        joint_id = self.model.body_jntadr[obj_id]
-        if joint_id != -1:
-            qvel_adr = self.model.jnt_dofadr[joint_id]
-            self.data.qvel[qvel_adr : qvel_adr + 6] = 0
-            mj.mj_forward(self.model, self.data)
-
-    def groff(self):
+    def _disable_gravity(self):
         self.model.opt.gravity[:] = [0, 0, 0]
         mj.mj_forward(self.model, self.data)
+
     def reset(self):
-        self.groff()
+        self._disable_gravity()
         random_pos = [
             0.25 + np.random.uniform(-0.01, 0.01),
             0.0 + np.random.uniform(-0.01, 0.01),
@@ -107,9 +95,9 @@ class XarmSim(Robot):
         yaw = np.random.uniform(-np.pi / 2, np.pi / 2)
 
         pose = t3d.affines.compose(
-            random_pos, t3d.euler.euler2mat(roll, pitch, yaw), [1, 1, 1]  #
-        )    
-        self.set_object_pose("pickup_object", pose)
+            random_pos, t3d.euler.euler2mat(roll, pitch, yaw), [1, 1, 1]
+        )
+        self._set_object_pose("pickup_object", pose)
         pose1 = self.get_object_pose()
         pose_start = pose1 @ t3d.affines.compose(
             [0, 0, -0.060], t3d.euler.euler2mat(0, 0, 0), [1, 1, 1]
@@ -119,7 +107,7 @@ class XarmSim(Robot):
         )
         return pose_start, pose_alignment_target
 
-    def set_object_pose(self, object_name, pose_matrix):
+    def _set_object_pose(self, object_name, pose_matrix):
         body_id = self.model.body(object_name).id
         self.data.xpos[body_id] = pose_matrix[:3, 3]
         quat = t3d.quaternions.mat2quat(pose_matrix[:3, :3])
@@ -137,14 +125,10 @@ class XarmSim(Robot):
                 self.data.qvel[qvel_adr : qvel_adr + 6] = 0
         mj.mj_forward(self.model, self.data)
 
-    def update_sim(self):
-        mj.mj_forward(self.model, self.data)
-        self.viewer.sync()
-
-    def gripper_close(self):
+    def _gripper_close(self):
         self._set_gripper_position(self.gripper_close_pos)
 
-    def gripper_open(self):
+    def _gripper_open(self):
         self._set_gripper_position(self.gripper_open_pos)
 
     def _set_gripper_position(self, pos, tolerance=1e-3, max_sim_steps=2000):
@@ -179,7 +163,7 @@ class XarmSim(Robot):
         self.viewer.sync()
         return True
 
-    def get_object_pose(self, object_name="pickup_object"):
+    def _get_object_pose(self, object_name="pickup_object"):
         try:
             obj_id = self.model.body(object_name).id
 
@@ -204,9 +188,7 @@ class XarmSim(Robot):
         }
 
         for i in range(self.model.ncam):
-            name = mujoco.mj_id2name(
-                self.model, mujoco.mjtObj.mjOBJ_CAMERA, i
-            )
+            name = mujoco.mj_id2name(self.model, mujoco.mjtObj.mjOBJ_CAMERA, i)
             self.renderer.update_scene(self.data, camera=name)
             image = self.renderer.render()
             obs["camera." + name] = image[:, :, ::-1]
