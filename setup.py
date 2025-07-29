@@ -16,6 +16,10 @@ setup(
         "transforms3d",
         "pybullet",
         "tqdm",
+        "matplotlib",
+        "mujoco",
+        "numpy",
+        "teleop[utils]",
     ],
     python_requires=">=3.7",
     classifiers=[
