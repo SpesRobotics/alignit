@@ -55,7 +55,29 @@ class XarmTable(Robot):
             'model': color_intrinsics.model,
             'coeffs': color_intrinsics.coeffs
         }        
-        
+    def reset(self):
+        self.groff()
+        random_pos = [
+            0.25 + np.random.uniform(-0.01, 0.01),
+            0.0 + np.random.uniform(-0.01, 0.01),
+            0.08,
+        ]
+        roll = np.pi
+        pitch = np.random.uniform(0, np.pi / 4)
+        yaw = np.random.uniform(-np.pi / 2, np.pi / 2)
+
+        pose = t3d.affines.compose(
+            random_pos, t3d.euler.euler2mat(roll, pitch, yaw), [1, 1, 1]  #
+        )    
+        self.set_object_pose("pickup_object", pose)
+        pose1 = self.get_object_pose()
+        pose_start = pose1 @ t3d.affines.compose(
+            [0, 0, -0.060], t3d.euler.euler2mat(0, 0, 0), [1, 1, 1]
+        )
+        pose_alignment_target = pose1 @ t3d.affines.compose(
+            [0, 0, -0.1], t3d.euler.euler2mat(0, 0, 0), [1, 1, 1]
+        )
+        return pose_start, pose_alignment_target    
     def gripper_close(self):
         self.arm.close_lite6_gripper()
     def reset(self, manual_height=0.05, world_z_offset=0.02):
