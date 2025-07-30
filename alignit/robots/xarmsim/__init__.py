@@ -98,7 +98,7 @@ class XarmSim(Robot):
             random_pos, t3d.euler.euler2mat(roll, pitch, yaw), [1, 1, 1]
         )
         self._set_object_pose("pickup_object", pose)
-        pose1 = self.get_object_pose()
+        pose1 = self._get_object_pose()
         pose_start = pose1 @ t3d.affines.compose(
             [0, 0, -0.060], t3d.euler.euler2mat(0, 0, 0), [1, 1, 1]
         )

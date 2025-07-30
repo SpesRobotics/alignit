@@ -1,7 +1,6 @@
 import torch
 from alignit.models.alignnet import AlignNet
 from alignit.utils.zhou import sixd_se3
-from alignit.robots.bullet import Bullet
 from alignit.utils.tfs import print_pose
 from alignit.robots.xarmsim import XarmSim
 import transforms3d as t3d
@@ -23,9 +22,9 @@ def main():
     robot = XarmSim()
 
     start_pose = t3d.affines.compose(
-        [0.330, 0, 0.35], t3d.euler.euler2mat(np.pi, 0, 0), [1, 1, 1]
+        [0.33, 0, 0.35], t3d.euler.euler2mat(np.pi, 0, 0), [1, 1, 1]
     )
-    robot.servo_to_pose(start_pose)
+    robot.servo_to_pose(start_pose, lin_tol=1e-2)
     total = 0
     tick = 0
     try:
