@@ -80,17 +80,17 @@ def main():
     features = Features(
         {"images": Sequence(Image()), "action": Sequence(Value("float32"))}
     )
-    for episode in range(20):
 
+    for episode in range(20):
         pose_start, pose_alignment_target = robot.reset()
 
-        #robot.servo_to_pose(pose_alignment_target, lin_tol=0.015, ang_tol=0.015)
+        # robot.servo_to_pose(pose_alignment_target, lin_tol=0.015, ang_tol=0.015)
 
         trajectory = generate_spiral_trajectory(
             pose_start,
             z_step=0.0007,
             radius_step=0.001,
-            num_steps=100,
+            num_steps=50,
             cone_angle=30,
             visible_sweep=60,
             viewing_angle_offset=-120,
@@ -99,14 +99,14 @@ def main():
         )
         frames = []
         for pose in trajectory:
-            robot.servo_to_pose(pose, lin_tol=0.05, ang_tol=0.05)
+            robot.servo_to_pose(pose, lin_tol=1e-3, ang_tol=0.01)
             current_pose = robot.pose()
 
             action_pose = np.linalg.inv(current_pose) @ pose_alignment_target
             action_sixd = se3_sixd(action_pose)
 
             observation = robot.get_observation()
-            frame = {"images": [observation["rgb"]], "action": action_sixd}
+            frame = {"images": [observation["rgb"].copy()], "action": action_sixd}
             frames.append(frame)
 
         print(f"Episode {episode+1} completed with {len(frames)} frames.")
