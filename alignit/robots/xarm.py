@@ -12,6 +12,9 @@ class Xarm(Robot):
     def __init__(self):
         config = RealSenseCameraConfig(
             serial_number_or_name="021222071076",
+            fps=60,
+            width=320,
+            height=240,
         )
         self.camera = RealSenseCamera(config)
 
@@ -27,7 +30,7 @@ class Xarm(Robot):
         self.robot.send_action(action)
 
     def get_observation(self):
-        rgb_image = self.camera.async_read()
+        rgb_image = self.camera.read()
 
         return {
             "rgb": rgb_image,
@@ -58,21 +61,21 @@ class Xarm(Robot):
             manual_height: Height above surface to maintain during manual movement (meters)
             world_z_offset: Additional Z offset in world frame after manual positioning (meters)
         """
-        manual_height = 0.05
-        world_z_offset = 0.02
+        manual_height = -0.05
+        world_z_offset = -0.02
         input("Press Enter after positioning the arm...")
         current_pose = self.pose()
         gripper_z_offset = np.array(
             [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, manual_height], [0, 0, 0, 1]]
         )
         offset_pose = current_pose @ gripper_z_offset
-        self.send_action(offset_pose)
+        self.servo_to_pose(pose=offset_pose)
 
         world_z_offset_mat = np.array(
             [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, world_z_offset], [0, 0, 0, 1]]
         )
         final_pose = offset_pose @ world_z_offset_mat
-        self.send_action(final_pose)
+        self.servo_to_pose(pose=final_pose)
 
         pose_start = current_pose @ t3d.affines.compose(
             [0, 0, -0.060], t3d.euler.euler2mat(0, 0, 0), [1, 1, 1]
@@ -80,6 +83,12 @@ class Xarm(Robot):
         pose_alignment_target = current_pose @ t3d.affines.compose(
             [0, 0, -0.1], t3d.euler.euler2mat(0, 0, 0), [1, 1, 1]
         )
+        _, (position, _, _) = self.robot._arm.get_joint_states()
+        for i in range(6):  
+            joint_name = f"joint{i+1}"  
+            self.robot._jacobi.set_joint_position(joint_name, position[i])
+
+
         return pose_start, pose_alignment_target
 
     def pose(self):
@@ -88,9 +97,14 @@ class Xarm(Robot):
 
 if __name__ == "__main__":
     xarm = Xarm()
-    obs = xarm.get_observation()
+    for i in range(10):
+        obs = xarm.get_observation()
+        frames = []
+        frame = {"images": [obs["rgb"]]}
+        frames.append(frame)
+
     pose_matrix = np.eye(4)
-    translation = [0.2, 0, 0.1]
+    translation = [0.23, 0, 0.1]
     rotation = t3d.euler.euler2mat(np.pi, 0, 0)
     pose_matrix = t3d.affines.compose(translation, rotation, [1, 1, 1])
 

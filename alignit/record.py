@@ -14,6 +14,7 @@ from datasets import (
 import os
 import shutil
 from alignit.utils.zhou import se3_sixd
+import time
 
 
 def generate_spiral_trajectory(
@@ -83,7 +84,7 @@ def main():
 
         pose_start, pose_alignment_target = robot.reset()
 
-        robot.servo_to_pose(pose_alignment_target, lin_tol=0.015, ang_tol=0.015)
+        #robot.servo_to_pose(pose_alignment_target, lin_tol=0.015, ang_tol=0.015)
 
         trajectory = generate_spiral_trajectory(
             pose_start,
@@ -105,7 +106,7 @@ def main():
             action_sixd = se3_sixd(action_pose)
 
             observation = robot.get_observation()
-            frame = {"images": [observation["camera.rgb"]], "action": action_sixd}
+            frame = {"images": [observation["rgb"]], "action": action_sixd}
             frames.append(frame)
 
         print(f"Episode {episode+1} completed with {len(frames)} frames.")
