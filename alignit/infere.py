@@ -55,8 +55,11 @@ def main():
             tick += 1
             avg = total / tick
             print(avg)
-
-            robot.servo_to_pose(action)
+            action = {
+                "pose": action,
+                "gripper.pos": 1.0,  # Optional: set gripper state (0.0=closed, 1.0=open)
+            }
+            robot.send_action(action)
     except KeyboardInterrupt:
         print("\nExiting...")
 

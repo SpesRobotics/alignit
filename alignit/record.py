@@ -81,7 +81,7 @@ def main():
         {"images": Sequence(Image()), "action": Sequence(Value("float32"))}
     )
 
-    for episode in range(3):
+    for episode in range(15):
         pose_start, pose_alignment_target = robot.reset()
 
         # robot.servo_to_pose(pose_alignment_target, lin_tol=0.015, ang_tol=0.015)
