@@ -21,13 +21,13 @@ def generate_spiral_trajectory(
     start_pose,
     z_step=0.1,
     radius_step=0.001,
-    num_steps=100,
+    num_steps=50,
     cone_angle=45,
     visible_sweep=180,
     viewing_angle_offset=0,
     angular_resolution=5,
     include_cone_poses=True,
-    lift_height_before_spiral=0.01,
+    lift_height_before_spiral=0.0005,
 ):
     trajectory = []
     R_start = start_pose[:3, :3]
@@ -81,7 +81,7 @@ def main():
         {"images": Sequence(Image()), "action": Sequence(Value("float32"))}
     )
 
-    for episode in range(20):
+    for episode in range(3):
         pose_start, pose_alignment_target = robot.reset()
 
         # robot.servo_to_pose(pose_alignment_target, lin_tol=0.015, ang_tol=0.015)
@@ -99,7 +99,7 @@ def main():
         )
         frames = []
         for pose in trajectory:
-            robot.servo_to_pose(pose, lin_tol=1e-3, ang_tol=0.01)
+            robot.servo_to_pose(pose, lin_tol=3e-3, ang_tol=0.03)
             current_pose = robot.pose()
 
             action_pose = np.linalg.inv(current_pose) @ pose_alignment_target
@@ -126,7 +126,7 @@ def main():
             shutil.rmtree("data/duck")
         shutil.move(temp_path, "data/duck")
 
-    robot.close()
+    robot.disconnect()
 
 
 if __name__ == "__main__":

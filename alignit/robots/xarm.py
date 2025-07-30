@@ -11,7 +11,7 @@ from alignit.utils.tfs import are_tfs_close
 class Xarm(Robot):
     def __init__(self):
         config = RealSenseCameraConfig(
-            serial_number_or_name="021222071076",
+            serial_number_or_name="233522070823",
             fps=60,
             width=320,
             height=240,
@@ -46,7 +46,7 @@ class Xarm(Robot):
                 "gripper.pos": 1.0,  # Optional: set gripper state (0.0=closed, 1.0=open)
             }
             self.send_action(action)
-            time.sleep(1.0 / 30.0)  # Adjust frequency as needed
+            time.sleep(1.0 / 60.0)  # Adjust frequency as needed
 
     def reset(self):
         """
@@ -63,7 +63,9 @@ class Xarm(Robot):
         """
         manual_height = -0.05
         world_z_offset = -0.02
+        self.robot.disconnect()
         input("Press Enter after positioning the arm...")
+        self.robot.connect()
         current_pose = self.pose()
         gripper_z_offset = np.array(
             [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, manual_height], [0, 0, 0, 1]]
@@ -78,7 +80,7 @@ class Xarm(Robot):
         self.servo_to_pose(pose=final_pose)
 
         pose_start = current_pose @ t3d.affines.compose(
-            [0, 0, -0.060], t3d.euler.euler2mat(0, 0, 0), [1, 1, 1]
+            [0, 0, -0.090], t3d.euler.euler2mat(0, 0, 0), [1, 1, 1]
         )
         pose_alignment_target = current_pose @ t3d.affines.compose(
             [0, 0, -0.1], t3d.euler.euler2mat(0, 0, 0), [1, 1, 1]
