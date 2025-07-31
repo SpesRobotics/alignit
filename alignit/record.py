@@ -17,31 +17,25 @@ from alignit.utils.zhou import se3_sixd
 import time
 
 
+import numpy as np
+from scipy.spatial.transform import Rotation as R
+
 def generate_spiral_trajectory(
     start_pose,
     z_step=0.1,
     radius_step=0.001,
     num_steps=50,
-    cone_angle=45,
-    visible_sweep=180,
-    viewing_angle_offset=0,
-    angular_resolution=5,
-    include_cone_poses=True,
     lift_height_before_spiral=0.0005,
+    max_random_rotation_angle=10.0,  # in degrees
 ):
     trajectory = []
     R_start = start_pose[:3, :3]
     t_start_initial = start_pose[:3, 3]
 
-    cone_angle_rad = np.deg2rad(cone_angle)
-
     object_z_axis = R_start[:, 2]
 
     lift_offset_world = object_z_axis * lift_height_before_spiral
     t_start_spiral = t_start_initial + lift_offset_world
-
-    start_angle = -visible_sweep / 2 + viewing_angle_offset
-    end_angle = visible_sweep / 2 + viewing_angle_offset
 
     for i in range(num_steps):
         radius = radius_step * i
@@ -53,27 +47,22 @@ def generate_spiral_trajectory(
 
         world_offset = R_start @ local_offset
         base_position = t_start_spiral + world_offset
+        x_rot = np.random.uniform(-10, 10)
+        y_rot = np.random.uniform(-10, 10)
+        z_rot = np.random.uniform(-10, 10)
+        
+        #random_angles = np.radians(np.random.uniform(-max_random_rotation_angle, max_random_rotation_angle, 3))
+        random_angles = np.radians([x_rot, y_rot, z_rot])
+        random_rotation = R.from_euler('xyz', random_angles).as_matrix()
+        
+        randomized_rotation = R_start @ random_rotation
 
         T = np.eye(4)
-        T[:3, :3] = R_start
+        T[:3, :3] = randomized_rotation
         T[:3, 3] = base_position
         trajectory.append(T)
 
-        if include_cone_poses:
-            for deg in np.arange(start_angle, end_angle, angular_resolution):
-                theta = np.deg2rad(deg)
-
-                tilt = t3d.euler.euler2mat(cone_angle_rad, 0, 0)
-                spin = t3d.euler.euler2mat(0, 0, theta)
-                R_cone = R_start @ spin @ tilt
-
-                T_cone = np.eye(4)
-                T_cone[:3, :3] = R_cone
-                T_cone[:3, 3] = base_position
-                trajectory.append(T_cone)
-
     return trajectory
-
 
 def main():
     robot = Xarm()
@@ -91,11 +80,6 @@ def main():
             z_step=0.0007,
             radius_step=0.001,
             num_steps=50,
-            cone_angle=30,
-            visible_sweep=60,
-            viewing_angle_offset=-120,
-            angular_resolution=10,
-            include_cone_poses=False,
         )
         frames = []
         for pose in trajectory:
