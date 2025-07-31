@@ -7,7 +7,7 @@ from torchvision.models import EfficientNet_B0_Weights, ResNet18_Weights
 class AlignNet(nn.Module):
     def __init__(
         self,
-        backbone_name="efficientnet_b0",
+        backbone_name="resnet18", 
         backbone_weights="DEFAULT",
         use_vector_input=True,
         fc_layers=[256, 128],

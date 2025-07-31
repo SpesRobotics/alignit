@@ -13,8 +13,9 @@ class Xarm(Robot):
         config = RealSenseCameraConfig(
             serial_number_or_name="233522070823",
             fps=60,
-            width=320,
-            height=240,
+            width=640,
+            height=480,
+            use_depth=True
         )
         self.camera = RealSenseCamera(config)
 
