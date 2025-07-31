@@ -12,6 +12,8 @@ import time
 
 def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Using device: {device}")
+
     # load model from file
     net = AlignNet(
         output_dim=9,
@@ -36,12 +38,11 @@ def main():
 
             # Convert images to tensor and reshape from HWC to CHW format
             images_tensor = (
-                torch.tensor(images, dtype=torch.float32)
+                torch.from_numpy(np.array(images))
                 .permute(0, 3, 1, 2)
                 .unsqueeze(0)
                 .to(device)
             )
-            print(torch.max(images_tensor))
             start = time.time()
             with torch.no_grad():
                 relative_action = net(images_tensor)
@@ -54,7 +55,6 @@ def main():
             total = total + elapsed
             tick += 1
             avg = total / tick
-            print(avg)
             action = {
                 "pose": action,
                 "gripper.pos": 1.0,  # Optional: set gripper state (0.0=closed, 1.0=open)
