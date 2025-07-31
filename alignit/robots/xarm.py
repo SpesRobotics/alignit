@@ -64,9 +64,32 @@ class Xarm(Robot):
         """
         manual_height = -0.05
         world_z_offset = -0.02
-        self.robot.disconnect()
-        input("Press Enter after positioning the arm...")
-        self.robot.connect()
+
+                # Set specific xyz within workspace bounds
+        rand_xyz = np.array([
+                    np.random.uniform(0.230, 0.340),   # x
+                    np.random.uniform(-0.120, 0.120),  # y
+                    0.010  # z
+                ])
+        # Set specific rpy (roll, pitch, yaw) values
+        roll = np.pi
+        pitch = 0.0
+        yaw = 0.0
+        rand_rot = t3d.euler.euler2mat(roll, pitch, yaw)
+        rand_pose = t3d.affines.compose(rand_xyz, rand_rot, [1, 1, 1])
+
+        # Move to random pose with gripper open
+        input("Press Enter to move...")
+        self.servo_to_pose(pose=rand_pose)
+        self.send_action({"gripper.pos": 1.0})  # open gripper
+
+        input("Press Enter to close gripper...")
+
+        self.send_action({"gripper.pos": 0.0})  # close gripper
+        time.sleep(2.0)
+        self.send_action({"gripper.pos": 1.0})  # open gripper again
+        time.sleep(0.5)
+
         current_pose = self.pose()
         gripper_z_offset = np.array(
             [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, manual_height], [0, 0, 0, 1]]
@@ -86,6 +109,7 @@ class Xarm(Robot):
         pose_alignment_target = current_pose @ t3d.affines.compose(
             [0, 0, -0.1], t3d.euler.euler2mat(0, 0, 0), [1, 1, 1]
         )
+
         _, (position, _, _) = self.robot._arm.get_joint_states()
         for i in range(6):  
             joint_name = f"joint{i+1}"  
