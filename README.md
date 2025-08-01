@@ -11,7 +11,7 @@ python -m alignit.record
 python -m alignit.train
 
 # Visualize dataset
-python -m alignit.visualize
+python -m alignit.visualize --dataset.path=./data/duck
 
 # Run inference
 python -m alignit.infere
