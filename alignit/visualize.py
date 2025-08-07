@@ -2,15 +2,8 @@ from alignit.utils.dataset import load_dataset
 from alignit.utils.zhou import sixd_se3
 from alignit.utils.tfs import get_pose_str
 import gradio as gr
-
-from dataclasses import dataclass, field
 import draccus
-from alignit.dataset.dataset_config import DatasetConfig
-
-
-@dataclass
-class VisualizeConfig:
-    dataset: DatasetConfig = field(default_factory=DatasetConfig)
+from alignit.config import VisualizeConfig
 
 
 @draccus.wrap()
@@ -31,7 +24,11 @@ def visualize(cfg: VisualizeConfig):
         outputs=[gr.Image(type="pil", label="Image"), gr.Text(label="Label")],
         title="Dataset Image Viewer",
         live=True,
-    ).launch()
+    ).launch(
+        share=cfg.share,
+        server_name=cfg.server_name,
+        server_port=cfg.server_port
+    )
 
 
 if __name__ == "__main__":

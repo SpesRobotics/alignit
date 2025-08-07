@@ -21,6 +21,7 @@ setup(
         "numpy",
         "teleop[utils]",
         "xarm-python-sdk",
+        "draccus",
     ],
     python_requires=">=3.7",
     classifiers=[

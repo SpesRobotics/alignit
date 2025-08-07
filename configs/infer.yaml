@@ -1,0 +1,23 @@
+# Configuration for inference/alignment in simulation
+robot:
+  type: "xarmsim"
+  gripper_open_pos: 0.008
+  gripper_close_pos: -0.008
+
+model:
+  backbone: "efficientnet_b0"
+  backbone_weights: "DEFAULT"
+  use_vector_input: false
+  fc_layers: [256, 128]
+  vector_hidden_dim: 64
+  output_dim: 9
+  feature_agg: "mean"
+
+model_path: "alignnet_model.pth"
+start_pose_xyz: [0.33, 0.0, 0.35]
+start_pose_rpy: [3.14159, 0.0, 0.0]  # pi, 0, 0
+lin_tolerance: 0.002  # 2mm
+ang_tolerance: 2.0    # 2 degrees
+max_iterations: null  # no limit
+debug_output: true
+

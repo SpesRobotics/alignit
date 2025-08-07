@@ -29,7 +29,8 @@ def are_tfs_close(a, b=None, lin_tol=1e-2, ang_tol=1e-2):
 
 def get_pose_str(pose, degrees=True):
     xyz = pose[:3, 3]
-    rpy = t3d.euler.mat2euler(np.asarray(pose[:3, :3]), axes="sxyz")
+    # Ensure data is float64 to avoid NumPy 2.0 copy=False error inside transforms3d
+    rpy = t3d.euler.mat2euler(np.asarray(pose[:3, :3], dtype=np.float64), axes="sxyz")
     if degrees:
         rpy = np.rad2deg(rpy)
     return f"{xyz[0]:.3f}, {xyz[1]:.3f}, {xyz[2]:.3f}, {rpy[0]:.3f}, {rpy[1]:.3f}, {rpy[2]:.3f}"
