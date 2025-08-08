@@ -65,6 +65,16 @@ class TrainConfig:
     epochs: int = field(default=100, metadata={"help": "Number of training epochs"})
     test_size: float = field(default=0.2, metadata={"help": "Fraction of data for testing"})
     random_seed: int = field(default=42, metadata={"help": "Random seed for train/test split"})
+    # Weights & Biases integration
+    wandb_project: Optional[str] = field(
+        default=None, metadata={"help": "Weights & Biases project name"}
+    )
+    wandb_run_name: Optional[str] = field(
+        default=None, metadata={"help": "Weights & Biases run name"}
+    )
+    wandb_tags: Optional[List[str]] = field(
+        default=None, metadata={"help": "Weights & Biases tags for the run"}
+    )
 
 
 @dataclass

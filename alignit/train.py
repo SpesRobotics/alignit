@@ -11,6 +11,13 @@ from alignit.config import TrainConfig
 from alignit.models.alignnet import AlignNet
 from alignit.utils.dataset import load_dataset_smart
 
+# Optional wandb import
+try:
+    import wandb
+    WANDB_AVAILABLE = True
+except ImportError:
+    WANDB_AVAILABLE = False
+
 
 def collate_fn(batch):
     images = [item["images"] for item in batch]
@@ -22,6 +29,19 @@ def collate_fn(batch):
 def main(cfg: TrainConfig):
     """Train AlignNet model using configuration parameters."""
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    # Initialize Weights & Biases if configured
+    use_wandb = WANDB_AVAILABLE and cfg.wandb_project is not None
+    if use_wandb:
+        wandb.init(
+            project=cfg.wandb_project,
+            name=cfg.wandb_run_name,
+            tags=cfg.wandb_tags,
+            config=cfg.__dict__
+        )
+        print(f"Initialized Weights & Biases project: {cfg.wandb_project}")
+    elif cfg.wandb_project and not WANDB_AVAILABLE:
+        print("Warning: wandb project specified but wandb not installed. Install with: pip install wandb")
 
     # Load the dataset from disk or HuggingFace Hub
     if cfg.dataset.hf_dataset_name:
@@ -61,7 +81,14 @@ def main(cfg: TrainConfig):
     criterion = MSELoss()
     net.train()
 
+    # Watch model with wandb if enabled
+    if use_wandb:
+        wandb.watch(net, log_freq=100)
+
     for epoch in range(cfg.epochs):
+        epoch_loss = 0.0
+        num_batches = 0
+        
         for batch in tqdm(train_loader, desc=f"Epoch {epoch+1}"):
             images = batch["images"]
             actions = batch["action"].to(device)
@@ -86,13 +113,32 @@ def main(cfg: TrainConfig):
             loss = criterion(outputs, actions)
             loss.backward()
             optimizer.step()
+            
+            epoch_loss += loss.item()
+            num_batches += 1
+            
             tqdm.write(f"Loss: {loss.item():.4f}")
+
+        # Calculate average epoch loss
+        avg_epoch_loss = epoch_loss / num_batches
+        
+        # Log to wandb if enabled
+        if use_wandb:
+            wandb.log({
+                "epoch": epoch + 1,
+                "loss": avg_epoch_loss,
+                "learning_rate": cfg.learning_rate
+            })
 
         # Save the trained model
         torch.save(net.state_dict(), cfg.model.path)
         tqdm.write(f"Model saved as {cfg.model.path}")
 
     print("Training complete.")
+    
+    # Finish wandb run
+    if use_wandb:
+        wandb.finish()
 
 
 if __name__ == "__main__":

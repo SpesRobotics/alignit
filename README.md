@@ -39,3 +39,13 @@ python -m alignit.train --dataset.hf_dataset_name=username/dataset-name --model.
 # Visualize HuggingFace dataset
 python -m alignit.visualize --dataset.hf_dataset_name=username/dataset-name
 ```
+
+### Weights & Biases Integration
+
+```bash
+# Train with wandb experiment tracking
+python -m alignit.train --wandb_project=my-robot-project --wandb_run_name=experiment-1
+
+# Combine HuggingFace Hub and wandb
+python -m alignit.train --dataset.hf_dataset_name=username/dataset-name --wandb_project=my-robot-project
+```
