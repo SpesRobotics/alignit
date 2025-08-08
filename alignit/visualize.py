@@ -1,6 +1,6 @@
 import gradio as gr
 import draccus
-
+from datasets import load_from_disk
 from alignit.utils.dataset import load_dataset
 from alignit.utils.zhou import sixd_se3
 from alignit.utils.tfs import get_pose_str
@@ -8,29 +8,27 @@ from alignit.config import VisualizeConfig
 
 
 @draccus.wrap()
-def visualize(cfg: VisualizeConfig):
-    dataset = load_dataset(cfg.dataset.path)
+def main():
+    dataset = load_from_disk("data/duck")
 
     def get_data(index):
+        print(index)
         item = dataset[index]
         image = item["images"][0]
+        depth = item["depth"][0]
         action_sixd = item["action"]
         action = sixd_se3(action_sixd)
         label = get_pose_str(action, degrees=True)
-        return image, label
+        return image,depth, label
 
     gr.Interface(
         fn=get_data,
         inputs=gr.Slider(0, len(dataset) - 1, step=1, label="Index", interactive=True),
-        outputs=[gr.Image(type="pil", label="Image"), gr.Text(label="Label")],
+        outputs=[gr.Image(type="pil", label="Image"),gr.Image(type="pil", label="Depth Image"), gr.Text(label="Label")],
         title="Dataset Image Viewer",
         live=True,
-    ).launch(
-        share=cfg.share,
-        server_name=cfg.server_name,
-        server_port=cfg.server_port
-    )
+    ).launch()
 
 
 if __name__ == "__main__":
-    visualize()
+    main()
