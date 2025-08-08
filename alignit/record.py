@@ -52,7 +52,6 @@ def generate_spiral_trajectory(
         y_rot = np.random.uniform(-10, 10)
         z_rot = np.random.uniform(-10, 10)
 
-        # random_angles = np.radians(np.random.uniform(-max_random_rotation_angle, max_random_rotation_angle, 3))
         random_angles = np.radians([x_rot, y_rot, z_rot])
         random_rotation = R.from_euler("xyz", random_angles).as_matrix()
 
@@ -67,7 +66,7 @@ def generate_spiral_trajectory(
 
 
 def main():
-    robot = Xarm()
+    robot = XarmSim()
     features = Features(
         {"images": Sequence(Image()), "action": Sequence(Value("float32"))}
     )
@@ -75,7 +74,7 @@ def main():
     for episode in range(15):
         pose_start, pose_alignment_target = robot.reset()
 
-        # robot.servo_to_pose(pose_alignment_target, lin_tol=0.015, ang_tol=0.015)
+        robot.servo_to_pose(pose_alignment_target, lin_tol=0.015, ang_tol=0.015)
 
         trajectory = generate_spiral_trajectory(
             pose_start,
@@ -92,7 +91,7 @@ def main():
             action_sixd = se3_sixd(action_pose)
 
             observation = robot.get_observation()
-            frame = {"images": [observation["rgb"].copy()], "action": action_sixd}
+            frame = {"images": [observation["camera.rgb"].copy()], "action": action_sixd}
             frames.append(frame)
 
         print(f"Episode {episode+1} completed with {len(frames)} frames.")

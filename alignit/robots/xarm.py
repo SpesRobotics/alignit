@@ -34,7 +34,7 @@ class Xarm(Robot):
         rgb_image = self.camera.read()
 
         return {
-            "rgb": rgb_image,
+            "camera.rgb": rgb_image,
         }
 
     def disconnect(self):
@@ -103,7 +103,7 @@ if __name__ == "__main__":
     for i in range(10):
         obs = xarm.get_observation()
         frames = []
-        frame = {"images": [obs["rgb"]]}
+        frame = {"images": [obs["camera.rgb"]]}
         frames.append(frame)
 
     pose_matrix = np.eye(4)
@@ -114,6 +114,6 @@ if __name__ == "__main__":
     xarm.servo_to_pose(pose=pose_matrix, lin_tol=1e-3, ang_tol=1e-2)
 
     print("Observation:")
-    print("RGB Image:", obs["rgb"])
+    print("RGB Image:", obs["camera.rgb"])
 
     xarm.disconnect()
