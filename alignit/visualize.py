@@ -8,7 +8,6 @@ def main():
     dataset = load_from_disk("data/duck")
 
     def get_data(index):
-        print(index)
         item = dataset[index]
         image = item["images"][0]
         action_sixd = item["action"]

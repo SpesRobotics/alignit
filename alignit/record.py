@@ -20,6 +20,7 @@ import time
 import numpy as np
 from scipy.spatial.transform import Rotation as R
 
+
 def generate_spiral_trajectory(
     start_pose,
     z_step=0.1,
@@ -50,11 +51,11 @@ def generate_spiral_trajectory(
         x_rot = np.random.uniform(-10, 10)
         y_rot = np.random.uniform(-10, 10)
         z_rot = np.random.uniform(-10, 10)
-        
-        #random_angles = np.radians(np.random.uniform(-max_random_rotation_angle, max_random_rotation_angle, 3))
+
+        # random_angles = np.radians(np.random.uniform(-max_random_rotation_angle, max_random_rotation_angle, 3))
         random_angles = np.radians([x_rot, y_rot, z_rot])
-        random_rotation = R.from_euler('xyz', random_angles).as_matrix()
-        
+        random_rotation = R.from_euler("xyz", random_angles).as_matrix()
+
         randomized_rotation = R_start @ random_rotation
 
         T = np.eye(4)
@@ -63,6 +64,7 @@ def generate_spiral_trajectory(
         trajectory.append(T)
 
     return trajectory
+
 
 def main():
     robot = Xarm()

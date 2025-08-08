@@ -15,7 +15,7 @@ class Xarm(Robot):
             fps=60,
             width=640,
             height=480,
-            use_depth=True
+            use_depth=True,
         )
         self.camera = RealSenseCamera(config)
 
@@ -72,7 +72,7 @@ class Xarm(Robot):
             [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, manual_height], [0, 0, 0, 1]]
         )
         offset_pose = current_pose @ gripper_z_offset
-        self.servo_to_pose(pose=offset_pose)  
+        self.servo_to_pose(pose=offset_pose)
 
         world_z_offset_mat = np.array(
             [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, world_z_offset], [0, 0, 0, 1]]
@@ -87,13 +87,10 @@ class Xarm(Robot):
             [0, 0, -0.1], t3d.euler.euler2mat(0, 0, 0), [1, 1, 1]
         )
 
-    
-
         _, (position, _, _) = self.robot._arm.get_joint_states()
-        for i in range(6):  
-            joint_name = f"joint{i+1}"  
+        for i in range(6):
+            joint_name = f"joint{i+1}"
             self.robot._jacobi.set_joint_position(joint_name, position[i])
-
 
         return pose_start, pose_alignment_target
 

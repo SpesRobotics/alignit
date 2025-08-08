@@ -7,7 +7,7 @@ from torchvision.models import EfficientNet_B0_Weights, ResNet18_Weights
 class AlignNet(nn.Module):
     def __init__(
         self,
-        backbone_name="efficientnet_b0", 
+        backbone_name="efficientnet_b0",
         backbone_weights="DEFAULT",
         use_vector_input=True,
         fc_layers=[256, 128],
@@ -126,4 +126,3 @@ if __name__ == "__main__":
     print(f"Inference time: {duration_ms:.3f} ms")
     print(f"Optimal for {1000 / duration_ms:.2f} fps")
     print("Output shape:", output.shape)
-
