@@ -2,23 +2,23 @@
 
 Model-free real-time robot arm alignment using one or more RGB(D) cameras.
 
-## Getting Started
+### Getting Started
+
 ```bash
 # Record a dataset
-python -m alignit.record
+python -m alignit.record --dataset.path=./data/test
 
 # Use the dataset to train a model
-python -m alignit.train
+python -m alignit.train --dataset.path=./data/test --model.path=./data/test_model.pth
 
 # Visualize dataset
-python -m alignit.visualize
+python -m alignit.visualize --dataset.path=./data/test
 
 # Run inference
-python -m alignit.infere
+python -m alignit.infere --model.path=./data/test_model.pth
 ```
 
-
-## Development
+### Development
 
 ```bash
 # Install the package in editable mode

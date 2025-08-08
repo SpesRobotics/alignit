@@ -103,7 +103,7 @@ class XarmSim(Robot):
             [0, 0, -0.1], t3d.euler.euler2mat(0, 0, 0), [1, 1, 1]
         )
         pose_alignment_target = pose1 @ t3d.affines.compose(
-            [0, 0, -0.12], t3d.euler.euler2mat(0, 0, 0), [1, 1, 1]
+            [0, 0, -0.15], t3d.euler.euler2mat(0, 0, 0), [1, 1, 1]
         )
         return pose_start, pose_alignment_target
 
