@@ -25,4 +25,7 @@ python -m alignit.infere --model.path=./data/test_model.pth
 git clone https://github.com/SpesRobotics/alignit.git
 cd alignit
 pip install -e .
+
+# Run tests
+python -m pytest
 ```

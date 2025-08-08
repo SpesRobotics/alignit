@@ -105,24 +105,3 @@ class AlignNet(nn.Module):
             fused = image_feats
 
         return self.head(fused)  # (B, output_dim)
-
-
-if __name__ == "__main__":
-    import time
-
-    batch_size = 1
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = AlignNet(backbone_name="efficientnet_b0", use_vector_input=True).to(device)
-
-    rgb_images = torch.randn(batch_size, 4, 3, 224, 224).to(device)
-    vector_inputs = [torch.randn(10).to(device) for _ in range(batch_size)]
-
-    output = None
-    start_time = time.time()
-    for i in range(100):
-        output = model(rgb_images, vector_inputs)
-    end_time = time.time()
-    duration_ms = ((end_time - start_time) / 100) * 1000
-    print(f"Inference time: {duration_ms:.3f} ms")
-    print(f"Optimal for {1000 / duration_ms:.2f} fps")
-    print("Output shape:", output.shape)
