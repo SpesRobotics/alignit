@@ -11,7 +11,7 @@ def load_dataset_smart(path: str):
         return load_from_disk(path)
     
     # Load from HuggingFace Hub
-    dataset = load_dataset(path)
+    dataset = hf_load_dataset(path)
     
     # Handle DatasetDict vs Dataset - return the train split if it exists
     if hasattr(dataset, 'keys') and 'train' in dataset:
