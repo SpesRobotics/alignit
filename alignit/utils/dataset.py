@@ -25,6 +25,10 @@ def load_dataset_smart(path: str):
         return dataset
 
 
+# Backward compatibility alias for existing tests
+load_dataset = load_dataset_smart
+
+
 def push_dataset_to_hub(dataset, username: str, dataset_name: str, token: str = None, private: bool = True):
     """Push dataset to HuggingFace Hub.
     
