@@ -1,13 +1,14 @@
+import transforms3d as t3d
+import numpy as np
+import time
+
 import torch
+
 from alignit.models.alignnet import AlignNet
 from alignit.utils.zhou import sixd_se3
 from alignit.utils.tfs import print_pose
 from alignit.robots.xarmsim import XarmSim
 from alignit.robots.xarm import Xarm
-
-import transforms3d as t3d
-import numpy as np
-import time
 
 
 def main():
@@ -23,7 +24,7 @@ def main():
     net.to(device)
     net.eval()
 
-    robot = Xarm()
+    robot = XarmSim()
 
     start_pose = t3d.affines.compose(
         [0.23, 0, 0.25], t3d.euler.euler2mat(np.pi, 0, 0), [1, 1, 1]
@@ -34,7 +35,7 @@ def main():
     try:
         while True:
             observation = robot.get_observation()
-            images = [observation["rgb"].astype(np.float32) / 255.0]
+            images = [observation["camera.rgb"].astype(np.float32) / 255.0]
 
             # Convert images to tensor and reshape from HWC to CHW format
             images_tensor = (
@@ -50,14 +51,13 @@ def main():
             relative_action = sixd_se3(relative_action)
             print_pose(relative_action)
 
-            action = robot.pose() @ relative_action
+            target_pose = robot.pose() @ relative_action
             elapsed = time.time() - start
             total = total + elapsed
             tick += 1
-            avg = total / tick
             action = {
-                "pose": action,
-                "gripper.pos": 1.0,  # Optional: set gripper state (0.0=closed, 1.0=open)
+                "pose": target_pose,
+                "gripper.pos": 1.0,
             }
             robot.send_action(action)
     except KeyboardInterrupt:

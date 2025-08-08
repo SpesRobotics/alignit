@@ -14,7 +14,6 @@ setup(
         "datasets",
         "gradio",
         "transforms3d",
-        "pybullet",
         "tqdm",
         "matplotlib",
         "mujoco",

@@ -1,4 +1,3 @@
-import time
 from pathlib import Path
 
 import mujoco as mj
@@ -6,6 +5,7 @@ import mujoco.viewer
 import numpy as np
 import transforms3d as t3d
 from teleop.utils.jacobi_robot import JacobiRobot
+
 from alignit.robots.robot import Robot
 
 
@@ -144,11 +144,11 @@ class XarmSim(Robot):
             steps_taken += 1
             self.current_gripper_pos = target_pos
 
-    def send_action(self, target_pose_matrix):
+    def send_action(self, action):
         base_pos = self.data.xpos[self.model.body("link_base").id]
         base_rot = self.data.xmat[self.model.body("link_base").id].reshape(3, 3)
         world_to_base = t3d.affines.compose(base_pos, base_rot, [1, 1, 1])
-        base_target_pose = np.linalg.inv(world_to_base) @ target_pose_matrix
+        base_target_pose = np.linalg.inv(world_to_base) @ action["pose"]
         servo_dt = self.model.opt.timestep
         self.robot_jacobi.servo_to_pose(base_target_pose, dt=servo_dt)
 
@@ -195,7 +195,7 @@ class XarmSim(Robot):
 
         return obs
 
-    def close(self):
+    def disconnect(self):
         print("Closing MuJoCo resources.")
         if self.viewer:
             self.viewer.close()
@@ -209,4 +209,4 @@ if __name__ == "__main__":
     pose[0, 3] += 0.1
     sim.servo_to_pose(pose)
 
-    sim.close()
+    sim.disconnect()

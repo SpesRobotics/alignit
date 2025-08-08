@@ -1,7 +1,8 @@
+import os
+import shutil
+
 import numpy as np
-import transforms3d as t3d
-from alignit.robots.xarmsim import XarmSim
-from alignit.robots.xarm import Xarm
+from scipy.spatial.transform import Rotation as R
 from datasets import (
     Dataset,
     Features,
@@ -11,14 +12,10 @@ from datasets import (
     load_from_disk,
     concatenate_datasets,
 )
-import os
-import shutil
+
+from alignit.robots.xarmsim import XarmSim
+from alignit.robots.xarm import Xarm
 from alignit.utils.zhou import se3_sixd
-import time
-
-
-import numpy as np
-from scipy.spatial.transform import Rotation as R
 
 
 def generate_spiral_trajectory(
@@ -91,7 +88,10 @@ def main():
             action_sixd = se3_sixd(action_pose)
 
             observation = robot.get_observation()
-            frame = {"images": [observation["camera.rgb"].copy()], "action": action_sixd}
+            frame = {
+                "images": [observation["camera.rgb"].copy()],
+                "action": action_sixd,
+            }
             frames.append(frame)
 
         print(f"Episode {episode+1} completed with {len(frames)} frames.")
