@@ -1,7 +1,6 @@
 """Configuration dataclasses for AlignIt using draccus."""
 
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Optional, List
 import numpy as np
 
@@ -12,13 +11,17 @@ class DatasetConfig:
     path: str = field(default="./data/duck", metadata={"help": "Path to the dataset directory"})
 
 
-@dataclass 
-class RobotConfig:
-    """Configuration for robot setup."""
-    type: str = field(default="xarmsim", metadata={"help": "Robot type: 'xarmsim', 'xarm', or 'bullet'"})
-    ip: Optional[str] = field(default=None, metadata={"help": "IP address for real robot (if applicable)"})
-    gripper_open_pos: float = field(default=0.008, metadata={"help": "Gripper open position"})
-    gripper_close_pos: float = field(default=-0.008, metadata={"help": "Gripper close position"})
+@dataclass
+class ModelConfig:
+    """Configuration for AlignNet model."""
+    backbone: str = field(default="efficientnet_b0", metadata={"help": "Backbone architecture: 'efficientnet_b0' or 'resnet18'"})
+    backbone_weights: str = field(default="DEFAULT", metadata={"help": "Backbone weights: 'DEFAULT' or None"})
+    use_vector_input: bool = field(default=False, metadata={"help": "Whether to use vector input"})
+    fc_layers: List[int] = field(default_factory=lambda: [256, 128], metadata={"help": "Hidden layer sizes for FC head"})
+    vector_hidden_dim: int = field(default=64, metadata={"help": "Output dimension of vector MLP"})
+    output_dim: int = field(default=9, metadata={"help": "Final output dimension (3 translation + 6 rotation)"})
+    feature_agg: str = field(default="mean", metadata={"help": "Feature aggregation method: 'mean' or 'max'"})
+    path: str = field(default="alignnet_model.pth", metadata={"help": "Path to save/load trained model"})
 
 
 @dataclass
@@ -38,7 +41,6 @@ class TrajectoryConfig:
 @dataclass
 class RecordConfig:
     """Configuration for data recording."""
-    robot: RobotConfig = field(default_factory=RobotConfig)
     dataset: DatasetConfig = field(default_factory=DatasetConfig)
     trajectory: TrajectoryConfig = field(default_factory=TrajectoryConfig)
     episodes: int = field(default=20, metadata={"help": "Number of episodes to record"})
@@ -49,23 +51,10 @@ class RecordConfig:
 
 
 @dataclass
-class ModelConfig:
-    """Configuration for AlignNet model."""
-    backbone: str = field(default="efficientnet_b0", metadata={"help": "Backbone architecture: 'efficientnet_b0' or 'resnet18'"})
-    backbone_weights: str = field(default="DEFAULT", metadata={"help": "Backbone weights: 'DEFAULT' or None"})
-    use_vector_input: bool = field(default=False, metadata={"help": "Whether to use vector input"})
-    fc_layers: List[int] = field(default_factory=lambda: [256, 128], metadata={"help": "Hidden layer sizes for FC head"})
-    vector_hidden_dim: int = field(default=64, metadata={"help": "Output dimension of vector MLP"})
-    output_dim: int = field(default=9, metadata={"help": "Final output dimension (3 translation + 6 rotation)"})
-    feature_agg: str = field(default="mean", metadata={"help": "Feature aggregation method: 'mean' or 'max'"})
-
-
-@dataclass
 class TrainConfig:
     """Configuration for model training."""
     dataset: DatasetConfig = field(default_factory=DatasetConfig)
     model: ModelConfig = field(default_factory=ModelConfig)
-    output_path: str = field(default="alignnet_model.pth", metadata={"help": "Path to save trained model"})
     batch_size: int = field(default=8, metadata={"help": "Training batch size"})
     learning_rate: float = field(default=1e-4, metadata={"help": "Learning rate for optimizer"})
     epochs: int = field(default=100, metadata={"help": "Number of training epochs"})
@@ -76,9 +65,7 @@ class TrainConfig:
 @dataclass
 class InferConfig:
     """Configuration for inference/alignment."""
-    robot: RobotConfig = field(default_factory=RobotConfig)
     model: ModelConfig = field(default_factory=ModelConfig)
-    model_path: str = field(default="alignnet_model.pth", metadata={"help": "Path to trained model"})
     start_pose_xyz: List[float] = field(default_factory=lambda: [0.33, 0.0, 0.35], metadata={"help": "Starting pose XYZ coordinates"})
     start_pose_rpy: List[float] = field(default_factory=lambda: [np.pi, 0.0, 0.0], metadata={"help": "Starting pose RPY angles"})
     lin_tolerance: float = field(default=2e-3, metadata={"help": "Linear tolerance for convergence (meters)"})
@@ -94,4 +81,3 @@ class VisualizeConfig:
     share: bool = field(default=False, metadata={"help": "Create a public Gradio link"})
     server_name: Optional[str] = field(default=None, metadata={"help": "Server name for Gradio interface"})
     server_port: Optional[int] = field(default=None, metadata={"help": "Server port for Gradio interface"})
-

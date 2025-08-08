@@ -82,8 +82,8 @@ def main(cfg: TrainConfig):
             tqdm.write(f"Loss: {loss.item():.4f}")
 
         # Save the trained model
-        torch.save(net.state_dict(), cfg.output_path)
-        tqdm.write(f"Model saved as {cfg.output_path}")
+        torch.save(net.state_dict(), cfg.model.path)
+        tqdm.write(f"Model saved as {cfg.model.path}")
 
     print("Training complete.")
 

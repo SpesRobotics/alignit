@@ -25,7 +25,7 @@ def main(cfg: InferConfig):
         output_dim=cfg.model.output_dim,
         feature_agg=cfg.model.feature_agg,
     )
-    net.load_state_dict(torch.load(cfg.model_path, map_location=device))
+    net.load_state_dict(torch.load(cfg.model.path, map_location=device))
     net.to(device)
     net.eval()
 
@@ -50,7 +50,7 @@ def main(cfg: InferConfig):
 
             # Convert images to tensor and reshape from HWC to CHW format
             images_tensor = (
-                torch.tensor(images, dtype=torch.float32)
+                torch.from_numpy(np.array(images))
                 .permute(0, 3, 1, 2)
                 .unsqueeze(0)
                 .to(device)
