@@ -22,7 +22,7 @@ setup(
         "teleop[utils]",
         "xarm-python-sdk",
         "draccus",
-        "lerobot @ git+https://github.com/huggingface/lerobot.git@67196c9",
+        "lerobot",
     ],
     python_requires=">=3.7",
     classifiers=[
