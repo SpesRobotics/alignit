@@ -1,4 +1,4 @@
-from datasets import load_from_disk, load_dataset
+from datasets import load_from_disk, load_dataset as hf_load_dataset
 
 
 def load_dataset_smart(path: str):
