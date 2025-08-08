@@ -9,6 +9,7 @@ import draccus
 
 from alignit.config import TrainConfig
 from alignit.models.alignnet import AlignNet
+from alignit.utils.dataset import load_dataset_smart
 
 
 def collate_fn(batch):
@@ -22,8 +23,15 @@ def main(cfg: TrainConfig):
     """Train AlignNet model using configuration parameters."""
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    # Load the dataset from disk
-    dataset = load_from_disk(cfg.dataset.path)
+    # Load the dataset from disk or HuggingFace Hub
+    if cfg.dataset.hf_dataset_name:
+        print(f"Loading dataset from HuggingFace Hub: {cfg.dataset.hf_dataset_name}")
+        dataset_path = cfg.dataset.hf_dataset_name
+    else:
+        print(f"Loading dataset from disk: {cfg.dataset.path}")
+        dataset_path = cfg.dataset.path
+    
+    dataset = load_dataset_smart(dataset_path)
 
     # Create model using config parameters
     net = AlignNet(

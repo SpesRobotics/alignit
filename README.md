@@ -26,3 +26,16 @@ git clone https://github.com/SpesRobotics/alignit.git
 cd alignit
 pip install -e .
 ```
+
+### HuggingFace Hub Integration
+
+```bash
+# Record and push to HuggingFace Hub
+python -m alignit.record --dataset.hf_username=username --dataset.hf_dataset_name=dataset-name
+
+# Train using HuggingFace dataset
+python -m alignit.train --dataset.hf_dataset_name=username/dataset-name --model.path=./data/test_model.pth
+
+# Visualize HuggingFace dataset
+python -m alignit.visualize --dataset.hf_dataset_name=username/dataset-name
+```
