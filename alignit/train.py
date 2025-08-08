@@ -1,14 +1,14 @@
+import torch
 from torch.utils.data import DataLoader
 from torch.optim import Adam
-import torch
 from torch.nn import MSELoss
 from tqdm import tqdm
 from datasets import load_from_disk
-from alignit.models.alignnet import AlignNet
 from torchvision import transforms
-import numpy as np
 import draccus
+
 from alignit.config import TrainConfig
+from alignit.models.alignnet import AlignNet
 
 
 def collate_fn(batch):
@@ -21,10 +21,10 @@ def collate_fn(batch):
 def main(cfg: TrainConfig):
     """Train AlignNet model using configuration parameters."""
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    
+
     # Load the dataset from disk
     dataset = load_from_disk(cfg.dataset.path)
-    
+
     # Create model using config parameters
     net = AlignNet(
         backbone_name=cfg.model.backbone,
@@ -38,22 +38,21 @@ def main(cfg: TrainConfig):
 
     # Split dataset
     train_dataset = dataset.train_test_split(
-        test_size=cfg.test_size, 
-        seed=cfg.random_seed
+        test_size=cfg.test_size, seed=cfg.random_seed
     )
 
     # Create data loader
     train_loader = DataLoader(
-        train_dataset["train"], 
-        batch_size=cfg.batch_size, 
-        shuffle=True, 
-        collate_fn=collate_fn
+        train_dataset["train"],
+        batch_size=cfg.batch_size,
+        shuffle=True,
+        collate_fn=collate_fn,
     )
-    
+
     optimizer = Adam(net.parameters(), lr=cfg.learning_rate)
     criterion = MSELoss()
     net.train()
-    
+
     for epoch in range(cfg.epochs):
         for batch in tqdm(train_loader, desc=f"Epoch {epoch+1}"):
             images = batch["images"]

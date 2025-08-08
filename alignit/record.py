@@ -1,6 +1,9 @@
-import numpy as np
+import os
+import shutil
+
 import transforms3d as t3d
-from alignit.robots.xarmsim import XarmSim
+import numpy as np
+from scipy.spatial.transform import Rotation as R
 from datasets import (
     Dataset,
     Features,
@@ -10,8 +13,9 @@ from datasets import (
     load_from_disk,
     concatenate_datasets,
 )
-import os
-import shutil
+
+from alignit.robots.xarmsim import XarmSim
+from alignit.robots.xarm import Xarm
 from alignit.utils.zhou import se3_sixd
 import draccus
 from alignit.config import RecordConfig
@@ -43,9 +47,17 @@ def generate_spiral_trajectory(start_pose, cfg):
 
         world_offset = R_start @ local_offset
         base_position = t_start_spiral + world_offset
+        x_rot = np.random.uniform(-10, 10)
+        y_rot = np.random.uniform(-10, 10)
+        z_rot = np.random.uniform(-10, 10)
+
+        random_angles = np.radians([x_rot, y_rot, z_rot])
+        random_rotation = R.from_euler("xyz", random_angles).as_matrix()
+
+        randomized_rotation = R_start @ random_rotation
 
         T = np.eye(4)
-        T[:3, :3] = R_start
+        T[:3, :3] = randomized_rotation
         T[:3, 3] = base_position
         trajectory.append(T)
 
@@ -72,24 +84,24 @@ def main(cfg: RecordConfig):
     features = Features(
         {"images": Sequence(Image()), "action": Sequence(Value("float32"))}
     )
-    
+
     for episode in range(cfg.episodes):
         pose_start, pose_alignment_target = robot.reset()
 
+        robot.servo_to_pose(pose_alignment_target, lin_tol=0.015, ang_tol=0.015)
+
         robot.servo_to_pose(
-            pose_alignment_target, 
-            lin_tol=cfg.lin_tol_alignment, 
-            ang_tol=cfg.ang_tol_alignment
+            pose_alignment_target,
+            lin_tol=cfg.lin_tol_alignment,
+            ang_tol=cfg.ang_tol_alignment,
         )
 
         trajectory = generate_spiral_trajectory(pose_start, cfg.trajectory)
-        
+
         frames = []
         for pose in trajectory:
             robot.servo_to_pose(
-                pose, 
-                lin_tol=cfg.lin_tol_trajectory, 
-                ang_tol=cfg.ang_tol_trajectory
+                pose, lin_tol=cfg.lin_tol_trajectory, ang_tol=cfg.ang_tol_trajectory
             )
             current_pose = robot.pose()
 
@@ -97,7 +109,10 @@ def main(cfg: RecordConfig):
             action_sixd = se3_sixd(action_pose)
 
             observation = robot.get_observation()
-            frame = {"images": [observation["camera.rgb"]], "action": action_sixd}
+            frame = {
+                "images": [observation["camera.rgb"].copy()],
+                "action": action_sixd,
+            }
             frames.append(frame)
 
         print(f"Episode {episode+1} completed with {len(frames)} frames.")
@@ -117,7 +132,7 @@ def main(cfg: RecordConfig):
             shutil.rmtree(cfg.dataset.path)
         shutil.move(temp_path, cfg.dataset.path)
 
-    robot.close()
+    robot.disconnect()
 
 
 if __name__ == "__main__":

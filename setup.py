@@ -1,5 +1,6 @@
 from setuptools import setup, find_packages
 
+
 setup(
     name="alignit",
     version="0.0.1",
@@ -14,7 +15,6 @@ setup(
         "datasets",
         "gradio",
         "transforms3d",
-        "pybullet",
         "tqdm",
         "matplotlib",
         "mujoco",
@@ -22,6 +22,7 @@ setup(
         "teleop[utils]",
         "xarm-python-sdk",
         "draccus",
+        "lerobot @ git+https://github.com/huggingface/lerobot.git@67196c9",
     ],
     python_requires=">=3.7",
     classifiers=[

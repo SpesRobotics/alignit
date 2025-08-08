@@ -1,8 +1,9 @@
+import gradio as gr
+import draccus
+
 from alignit.utils.dataset import load_dataset
 from alignit.utils.zhou import sixd_se3
 from alignit.utils.tfs import get_pose_str
-import gradio as gr
-import draccus
 from alignit.config import VisualizeConfig
 
 

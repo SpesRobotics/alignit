@@ -13,4 +13,8 @@ class Robot:
 
     def servo_to_pose(self, pose, lin_tol=1e-3, ang_tol=1e-2):
         while not are_tfs_close(self.pose(), pose, lin_tol, ang_tol):
-            self.send_action(pose)
+            self.send_action(
+                {
+                    "pose": pose,
+                }
+            )
