@@ -1,8 +1,0 @@
-# Configuration for dataset visualization
-dataset:
-  path: "./data/duck"
-
-share: false
-server_name: null
-server_port: null
-
