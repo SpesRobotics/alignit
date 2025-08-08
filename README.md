@@ -2,6 +2,12 @@
 
 Model-free real-time robot arm alignment using one or more RGB(D) cameras.
 
+
+| ![Data Recording](media/record.gif) | ![Model Training](media/train.gif) | ![Inference](media/inference.gif) |
+|:------------------------------------:|:-----------------------------------:|:----------------------------------:|
+| **Record an Object** <br> (data is being automatically collected and labeled) | **Train the Model**                  | **Align It** <br /> (model outputs relative poses to align the gripper with the object)                     |
+
+
 ### Getting Started
 
 ```bash
