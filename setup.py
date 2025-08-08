@@ -14,13 +14,13 @@ setup(
         "datasets",
         "gradio",
         "transforms3d",
-        "pybullet",
         "tqdm",
         "matplotlib",
         "mujoco",
         "numpy",
         "teleop[utils]",
         "xarm-python-sdk",
+        "lerobot @ git+https://github.com/huggingface/lerobot.git@67196c9"
     ],
     python_requires=">=3.7",
     classifiers=[

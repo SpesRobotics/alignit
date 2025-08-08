@@ -1,7 +1,8 @@
 from datasets import load_from_disk
+import gradio as gr
+
 from alignit.utils.zhou import sixd_se3
 from alignit.utils.tfs import get_pose_str
-import gradio as gr
 
 
 def main():

@@ -1,12 +1,12 @@
+import torch
 from torch.utils.data import DataLoader
 from torch.optim import Adam
-import torch
 from torch.nn import MSELoss
 from tqdm import tqdm
 from datasets import load_from_disk
-from alignit.models.alignnet import AlignNet
 from torchvision import transforms
-import numpy as np
+
+from alignit.models.alignnet import AlignNet
 
 
 def collate_fn(batch):

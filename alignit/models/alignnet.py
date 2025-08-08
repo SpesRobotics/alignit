@@ -126,4 +126,3 @@ if __name__ == "__main__":
     print(f"Inference time: {duration_ms:.3f} ms")
     print(f"Optimal for {1000 / duration_ms:.2f} fps")
     print("Output shape:", output.shape)
-

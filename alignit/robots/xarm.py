@@ -1,46 +1,121 @@
+import time
+
+from lerobot.cameras.realsense import RealSenseCamera, RealSenseCameraConfig
+from lerobot_xarm.xarm import Xarm as LeXarm
+from lerobot_xarm.config import XarmConfig
 import numpy as np
-from xarm.wrapper import XArmAPI
 import transforms3d as t3d
 
+from alignit.robots.robot import Robot
+from alignit.utils.tfs import are_tfs_close
 
-class Xarm:
-    def __init__(self, ip):
-        self.ip = ip
-        self.arm = None
 
-    def connect(self):
-        self.arm = XArmAPI(self.ip, is_radian=True)
-        self.arm.connect()
-        self.arm.motion_enable(enable=True)
-        self.arm.set_mode(1)
-        self.arm.set_state(state=0)
-
-    def joint_positions(self):
-        code, (joint_angles, joint_velocities, joint_efforts) = (
-            self._arm.get_joint_states()
+class Xarm(Robot):
+    def __init__(self):
+        config = RealSenseCameraConfig(
+            serial_number_or_name="233522070823",
+            fps=60,
+            width=640,
+            height=480,
+            use_depth=True,
         )
-        return np.array(joint_angles)
+        self.camera = RealSenseCamera(config)
+
+        robot_config = XarmConfig()
+        self.robot = LeXarm(robot_config)
+        self._connect()
+
+    def _connect(self):
+        self.camera.connect()
+        self.robot.connect()
+
+    def send_action(self, action):
+        self.robot.send_action(action)
+
+    def get_observation(self):
+        rgb_image = self.camera.read()
+
+        return {
+            "camera.rgb": rgb_image,
+        }
+
+    def disconnect(self):
+        self.camera.disconnect()
+
+    def servo_to_pose(self, pose, lin_tol=1e-3, ang_tol=1e-2):
+        while not are_tfs_close(self.pose(), pose, lin_tol, ang_tol):
+            action = {
+                "pose": pose,
+                "gripper.pos": 1.0,  # Optional: set gripper state (0.0=closed, 1.0=open)
+            }
+            self.send_action(action)
+            time.sleep(1.0 / 60.0)  # Adjust frequency as needed
+
+    def reset(self):
+        """
+        Reset routine:
+        1. Allows manual movement of the arm
+        2. Waits for user input (Enter key)
+        3. Applies gripper-frame Z offset
+        4. Applies world-frame Z offset
+        5. Returns to normal operation
+
+        Args:
+            manual_height: Height above surface to maintain during manual movement (meters)
+            world_z_offset: Additional Z offset in world frame after manual positioning (meters)
+        """
+        manual_height = -0.05
+        world_z_offset = -0.02
+        self.robot.disconnect()
+        input("Press Enter after positioning the arm...")
+        self.robot.connect()
+        current_pose = self.pose()
+        gripper_z_offset = np.array(
+            [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, manual_height], [0, 0, 0, 1]]
+        )
+        offset_pose = current_pose @ gripper_z_offset
+        self.servo_to_pose(pose=offset_pose)
+
+        world_z_offset_mat = np.array(
+            [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, world_z_offset], [0, 0, 0, 1]]
+        )
+        final_pose = offset_pose @ world_z_offset_mat
+        self.servo_to_pose(pose=final_pose)
+
+        pose_start = current_pose @ t3d.affines.compose(
+            [0, 0, -0.090], t3d.euler.euler2mat(0, 0, 0), [1, 1, 1]
+        )
+        pose_alignment_target = current_pose @ t3d.affines.compose(
+            [0, 0, -0.1], t3d.euler.euler2mat(0, 0, 0), [1, 1, 1]
+        )
+
+        _, (position, _, _) = self.robot._arm.get_joint_states()
+        for i in range(6):
+            joint_name = f"joint{i+1}"
+            self.robot._jacobi.set_joint_position(joint_name, position[i])
+
+        return pose_start, pose_alignment_target
 
     def pose(self):
-        ok, pose = self.arm.get_position()
-        if ok != 0:
-            raise RuntimeError(f"Failed to get arm position: {ok}")
+        return self.robot._jacobi.get_ee_pose()
 
-        translation = np.array(pose[:3]) / 1000
-        eulers = np.array(pose[3:])
-        rotation = t3d.euler.euler2mat(eulers[0], eulers[1], eulers[2], "sxyz")
-        pose = t3d.affines.compose(translation, rotation, np.ones(3))
-        return pose
 
-    def servoj(self, joint_positions):
-        self.arm.set_servo_angle_j(joint_positions)
+if __name__ == "__main__":
+    xarm = Xarm()
+    for i in range(10):
+        obs = xarm.get_observation()
+        frames = []
+        frame = {"images": [obs["camera.rgb"]]}
+        frames.append(frame)
 
-    def servo(self, pose):
-        x = pose[0, 3] * 1000
-        y = pose[1, 3] * 1000
-        z = pose[2, 3] * 1000
-        roll, pitch, yaw = t3d.euler.mat2euler(pose[:3, :3])
-        error = self.arm.set_servo_cartesian(
-            [x, y, z, roll, pitch, yaw], speed=100, mvacc=100
-        )
-        return error
+    pose_matrix = np.eye(4)
+    translation = [0.23, 0, 0.1]
+    rotation = t3d.euler.euler2mat(np.pi, 0, 0)
+    pose_matrix = t3d.affines.compose(translation, rotation, [1, 1, 1])
+
+    xarm.servo_to_pose(pose=pose_matrix, lin_tol=1e-3, ang_tol=1e-2)
+
+    print("Observation:")
+    print("RGB Image:", obs["camera.rgb"])
+
+    xarm.disconnect()
