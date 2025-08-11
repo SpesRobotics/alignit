@@ -46,6 +46,13 @@ class ModelConfig:
         default="alignnet_model.pth",
         metadata={"help": "Path to save/load trained model"},
     )
+    use_depth_input: bool = field(
+        default=True, 
+        metadata={"help": "Whether to use depth input for the model"}
+    )
+    depth_hidden_dim: int = field(
+        default=128, metadata={"help": "Output dimension of depth CNN"}
+    )
 
 
 @dataclass

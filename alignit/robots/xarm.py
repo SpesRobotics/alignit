@@ -33,10 +33,12 @@ class Xarm(Robot):
         self.robot.send_action(action)
 
     def get_observation(self):
-        rgb_image = self.camera.read()
+        rgb_image,depth_image,acqusition_time = self.camera.async_read()
 
         return {
-            "camera.rgb": rgb_image,
+            "rgb": rgb_image,
+            "depth": depth_image,
+            "timestamp": acqusition_time
         }
 
     def disconnect(self):

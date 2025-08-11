@@ -17,6 +17,17 @@ class AlignNet(nn.Module):
         output_dim=7,
         feature_agg="mean",
     ):
+        """
+        :param backbone_name: 'efficientnet_b0' or 'resnet18'
+        :param backbone_weights: 'DEFAULT' or None
+        :param use_vector_input: whether to accept a vector input
+        :param fc_layers: list of hidden layer sizes for the fully connected head
+        :param vector_hidden_dim: output dim of the vector MLP
+        :param output_dim: final output vector size
+        :param feature_agg: 'mean' or 'max' across image views
+        :param use_depth_input: whether to accept depth input
+        :param depth_hidden_dim: output dim of the depth MLP
+        """
         super().__init__()
         self.use_vector_input = use_vector_input
         self.use_depth_input = use_depth_input

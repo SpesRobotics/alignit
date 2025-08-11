@@ -1,6 +1,5 @@
 import gradio as gr
 import draccus
-from datasets import load_from_disk
 from alignit.utils.dataset import load_dataset
 from alignit.utils.zhou import sixd_se3
 from alignit.utils.tfs import get_pose_str
@@ -8,8 +7,8 @@ from alignit.config import VisualizeConfig
 
 
 @draccus.wrap()
-def main():
-    dataset = load_from_disk("data/duck")
+def visualize(cfg: VisualizeConfig):
+    dataset = load_dataset(cfg.dataset.path)
 
     def get_data(index):
         print(index)
@@ -31,4 +30,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    visualize()

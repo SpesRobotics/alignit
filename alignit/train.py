@@ -13,29 +13,40 @@ from alignit.models.alignnet import AlignNet
 
 def collate_fn(batch):
     images = [item["images"] for item in batch]
+    depth_images = [item.get("depth", None) for item in batch]
     actions = [item["action"] for item in batch]
-    return {"images": images, "action": torch.tensor(actions, dtype=torch.float32)}
+    return {"images": images, "depth_images": depth_images, "action": torch.tensor(actions, dtype=torch.float32)}
 
 
 @draccus.wrap()
-def main():
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    # Load the dataset from disk
+def main(cfg: TrainConfig):
+    """Train AlignNet model using configuration parameters."""
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")    # Load the dataset from disk
     dataset = load_from_disk("data/duck")
     net = AlignNet(
-        output_dim=9,  
-        use_vector_input=False,  
+        backbone_name=cfg.model.backbone,
+        backbone_weights=cfg.model.backbone_weights,
+        use_vector_input=cfg.model.use_vector_input,
+        fc_layers=cfg.model.fc_layers,
+        vector_hidden_dim=cfg.model.vector_hidden_dim,
+        output_dim=cfg.model.output_dim,
+        feature_agg=cfg.model.feature_agg,
     ).to(device)
 
-    train_dataset = dataset.train_test_split(test_size=0.2, seed=42)
-
-    train_loader = DataLoader(
-        train_dataset["train"], batch_size=4, shuffle=True, collate_fn=collate_fn
+    train_dataset = dataset.train_test_split(
+        test_size=cfg.test_size, seed=cfg.random_seed
     )
-    optimizer = Adam(net.parameters(), lr=1e-4)
+    train_loader = DataLoader(
+        train_dataset["train"],
+        batch_size=cfg.batch_size,
+        shuffle=True,
+        collate_fn=collate_fn,
+    )
+
+    optimizer = Adam(net.parameters(), lr=cfg.learning_rate)
     criterion = MSELoss()
     net.train()
-    for epoch in range(100):
+    for epoch in range(cfg.epochs):
         for batch in tqdm(train_loader, desc=f"Epoch {epoch+1}"):
             images = batch["images"]
             depth_images_pil = batch["depth_images"]
