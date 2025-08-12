@@ -13,10 +13,10 @@ from datasets import (
     load_from_disk,
     concatenate_datasets,
 )
-
 from alignit.robots.xarmsim import XarmSim
 from alignit.robots.xarm import Xarm
 from alignit.utils.zhou import se3_sixd
+from alignit.utils.dataset import push_dataset_to_hub
 import draccus
 from alignit.config import RecordConfig
 
@@ -131,6 +131,22 @@ def main(cfg: RecordConfig):
         if os.path.exists(cfg.dataset.path):
             shutil.rmtree(cfg.dataset.path)
         shutil.move(temp_path, cfg.dataset.path)
+
+    # Push to HuggingFace Hub if configured
+    if cfg.dataset.hf_username and cfg.dataset.hf_dataset_name:
+        print(f"Pushing dataset to HuggingFace Hub: {cfg.dataset.hf_username}/{cfg.dataset.hf_dataset_name}")
+        try:
+            repo_id = push_dataset_to_hub(
+                combined_dataset,
+                cfg.dataset.hf_username,
+                cfg.dataset.hf_dataset_name,
+                cfg.dataset.hf_token,
+                private=True  # Make private by default for safety
+            )
+            print(f"Successfully pushed dataset to {repo_id}")
+        except Exception as e:
+            print(f"Failed to push dataset to HuggingFace Hub: {e}")
+            print("Dataset saved locally but not uploaded to Hub")
 
     robot.disconnect()
 
