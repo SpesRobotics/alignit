@@ -40,7 +40,7 @@ class AlignNet(nn.Module):
         self.image_fc = nn.Sequential(
             nn.Linear(self.image_feature_dim, fc_layers[0]), nn.ReLU()
         )
-
+        
         if use_depth_input:
             self.depth_cnn = nn.Sequential(
                 nn.Conv2d(1, 8, 3, padding=1), nn.ReLU(),
@@ -127,6 +127,8 @@ class AlignNet(nn.Module):
             features.append(vec_feats)
 
         fused = torch.cat(features, dim=1)
+        print("Fused shape:", fused.shape)
+
         return self.head(fused)  # (B, output_dim)
 
 
