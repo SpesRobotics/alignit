@@ -38,6 +38,7 @@ def test_alignnet_performance():
 
     assert elapsed_time < 0.5
 
+
 def test_alignnet_with_depth_input():
     model = AlignNet(
         backbone_name="resnet18",backbone_weights=None,use_vector_input=False,use_depth_input=True, output_dim=7)
@@ -47,6 +48,7 @@ def test_alignnet_with_depth_input():
     with torch.no_grad():
         y = model(x, depth_images=depth)
     assert y.shape == (2, 7)
+
 
 def test_alignnet_with_all_inputs():
     # New test for combined inputs

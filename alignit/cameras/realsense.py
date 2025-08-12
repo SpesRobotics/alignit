@@ -1,10 +1,5 @@
-#reference to https://github.com/huggingface/lerobot/tree/main
-#async_read now returns both rgb and depth images
-
-
-"""
-Provides the RealSenseCamera class for capturing frames from Intel RealSense cameras.
-"""
+# Reference to https://github.com/huggingface/lerobot/tree/main
+# Changed async_read now returns both RGB and depth images
 
 import logging
 import time
