@@ -25,11 +25,7 @@ def visualize(cfg: VisualizeConfig):
         outputs=[gr.Image(type="pil", label="Image"), gr.Text(label="Label")],
         title="Dataset Image Viewer",
         live=True,
-    ).launch(
-        share=cfg.share,
-        server_name=cfg.server_name,
-        server_port=cfg.server_port
-    )
+    ).launch(share=cfg.share, server_name=cfg.server_name, server_port=cfg.server_port)
 
 
 if __name__ == "__main__":
