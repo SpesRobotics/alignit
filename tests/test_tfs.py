@@ -21,5 +21,5 @@ def test_get_pose_str_format():
     pose = np.eye(4)
     s = get_pose_str(pose)
     assert isinstance(s, str)
-    parts = s.split(',')
+    parts = s.split(",")
     assert len(parts) == 6
