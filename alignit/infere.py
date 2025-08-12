@@ -70,7 +70,7 @@ def main(cfg: InferConfig):
             if cfg.debug_output:
                 print_pose(relative_action)
 
-            relative_action [:3,:3] = relative_action[:3,:3] @ relative_action[:3,:3] @ relative_action[:3,:3]
+            relative_action[:3, :3] = np.linalg.matrix_power(relative_action[:3, :3], cfg.num_multiplications)
 
             # Check convergence
             if are_tfs_close(
@@ -84,10 +84,10 @@ def main(cfg: InferConfig):
                 print("Alignment achieved - stopping.")
                 break
 
-            action = robot.pose() @ relative_action
+            target_pose = robot.pose() @ relative_action
             iteration += 1
             action = {
-                "pose": action,
+                "pose": target_pose,
                 "gripper.pos": 1.0,
             }
             robot.send_action(action)

@@ -1,11 +1,9 @@
 import time
-
 from lerobot.cameras.realsense import RealSenseCamera, RealSenseCameraConfig
 from lerobot_xarm.xarm import Xarm as LeXarm
 from lerobot_xarm.config import XarmConfig
 import numpy as np
 import transforms3d as t3d
-
 from alignit.robots.robot import Robot
 from alignit.utils.tfs import are_tfs_close
 
@@ -33,12 +31,11 @@ class Xarm(Robot):
         self.robot.send_action(action)
 
     def get_observation(self):
-        rgb_image,depth_image,acqusition_time = self.camera.async_read()
+        rgb_image, depth_image, acquisition_time = self.camera.async_read()
 
         return {
             "rgb": rgb_image,
             "depth": depth_image,
-            "timestamp": acqusition_time
         }
 
     def disconnect(self):

@@ -156,6 +156,11 @@ class InferConfig:
         default=5,
         metadata={"help": "Number of iterations within tolerance before stopping"},
     )
+    num_multiplications: int = field(
+        default=3,
+        metadata={
+            "help": "Number of times to multiply the transformation matrix"},
+    )
 
 
 @dataclass

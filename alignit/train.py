@@ -21,8 +21,8 @@ def collate_fn(batch):
 @draccus.wrap()
 def main(cfg: TrainConfig):
     """Train AlignNet model using configuration parameters."""
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")    # Load the dataset from disk
-    dataset = load_from_disk("data/duck")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    dataset = load_from_disk(cfg.dataset.path)
     net = AlignNet(
         backbone_name=cfg.model.backbone,
         backbone_weights=cfg.model.backbone_weights,
@@ -82,13 +82,13 @@ def main(cfg: TrainConfig):
             batch_depth_tensors = torch.stack(batch_depth_tensors, dim=0).to(device)
 
             optimizer.zero_grad()
-            outputs = net(batch_rgb_tensors, depth_images=batch_depth_tensors) # <--- Pass depth_images
+            outputs = net(batch_rgb_tensors, depth_images=batch_depth_tensors)
             loss = criterion(outputs, actions)
             loss.backward()
             optimizer.step()
             tqdm.write(f"Loss: {loss.item():.4f}")
-        torch.save(net.state_dict(), "alignnet_model.pth")
-        tqdm.write("Model saved as alignnet_model.pth")
+        torch.save(net.state_dict(), cfg.model.path)
+        tqdm.write(f"Model saved as {cfg.model.path}")
 
     print("Training complete.")
 

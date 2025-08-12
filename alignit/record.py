@@ -5,7 +5,6 @@ import numpy as np
 from scipy.spatial.transform import Rotation as R
 from alignit.robots.xarm import Xarm
 from alignit.utils.zhou import se3_sixd
-import argparse  # Added for command line arguments
 import draccus
 from alignit.config import RecordConfig
 from alignit.robots.xarmsim import XarmSim
@@ -88,9 +87,9 @@ def main(cfg: RecordConfig):
         robot.servo_to_pose(pose_alignment_target, lin_tol=0.015, ang_tol=0.015)
 
         robot.servo_to_pose(
-                pose_alignment_target,
-                lin_tol=cfg.lin_tol_alignment,
-                ang_tol=cfg.ang_tol_alignment,
+            pose_alignment_target,
+            lin_tol=cfg.lin_tol_alignment,
+            ang_tol=cfg.ang_tol_alignment,
         )
         trajectory = generate_spiral_trajectory(pose_start, cfg.trajectory)
     

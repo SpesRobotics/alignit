@@ -11,22 +11,25 @@ def visualize(cfg: VisualizeConfig):
     dataset = load_dataset(cfg.dataset.path)
 
     def get_data(index):
-        print(index)
         item = dataset[index]
         image = item["images"][0]
         depth = item["depth"][0]
         action_sixd = item["action"]
         action = sixd_se3(action_sixd)
         label = get_pose_str(action, degrees=True)
-        return image,depth, label
+        return image, depth, label
 
     gr.Interface(
         fn=get_data,
         inputs=gr.Slider(0, len(dataset) - 1, step=1, label="Index", interactive=True),
-        outputs=[gr.Image(type="pil", label="Image"),gr.Image(type="pil", label="Depth Image"), gr.Text(label="Label")],
+        outputs=[gr.Image(type="pil", label="Image"), gr.Image(type="pil", label="Depth Image"), gr.Text(label="Label")],
         title="Dataset Image Viewer",
         live=True,
-    ).launch()
+    ).launch(
+        share=cfg.share,
+        server_name=cfg.server_name,
+        server_port=cfg.server_port
+    )
 
 
 if __name__ == "__main__":

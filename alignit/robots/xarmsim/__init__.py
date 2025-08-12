@@ -189,7 +189,6 @@ class XarmSim(Robot):
 
         for i in range(self.model.ncam):
             name = mujoco.mj_id2name(self.model, mujoco.mjtObj.mjOBJ_CAMERA, i)
-            
             self.renderer.update_scene(self.data, camera=name)
             image = self.renderer.render()
             self.renderer.enable_depth_rendering()

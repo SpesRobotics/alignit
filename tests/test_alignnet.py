@@ -13,7 +13,7 @@ def test_alignnet_forward_shapes_cpu():
 
 
 def test_alignnet_with_vector_input():
-    model = AlignNet(backbone_name="resnet18", backbone_weights=None, use_vector_input=True, output_dim=7,use_depth_input=False)
+    model = AlignNet(backbone_name="resnet18", backbone_weights=None, use_vector_input=True, output_dim=7, use_depth_input=False)
     model.eval()
     x = torch.randn(1, 2, 3, 64, 64)
     vecs = [torch.randn(5)]
@@ -23,7 +23,7 @@ def test_alignnet_with_vector_input():
 
 
 def test_alignnet_performance():
-    model = AlignNet(backbone_name="efficientnet_b0", backbone_weights=None, use_vector_input=True, output_dim=7,use_depth_input=False)
+    model = AlignNet(backbone_name="efficientnet_b0", backbone_weights=None, use_vector_input=True, output_dim=7, use_depth_input=False)
     model.eval()
     x = torch.randn(1, 3, 3, 224, 224)  # B=1, N=3 views
     vecs = [torch.randn(5)]
@@ -41,7 +41,7 @@ def test_alignnet_performance():
 
 def test_alignnet_with_depth_input():
     model = AlignNet(
-        backbone_name="resnet18",backbone_weights=None,use_vector_input=False,use_depth_input=True, output_dim=7)
+        backbone_name="resnet18", backbone_weights=None, use_vector_input=False, use_depth_input=True, output_dim=7)
     model.eval()
     x = torch.randn(2, 3, 3, 64, 64)  # RGB images
     depth = torch.randn(2, 3, 1, 64, 64)  # Depth images
