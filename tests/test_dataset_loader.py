@@ -1,7 +1,3 @@
-import os
-
-import pytest
-
 from alignit.utils.dataset import load_dataset
 
 
@@ -19,6 +15,7 @@ def test_load_dataset_local(monkeypatch, tmp_path):
 
     # Patch inside module
     import alignit.utils.dataset as ds
+
     ds.load_from_disk = fake_load_from_disk
 
     d = load_dataset(str(tmp_path))
@@ -35,6 +32,7 @@ def test_load_dataset_hub(monkeypatch):
         return Dummy(name)
 
     import alignit.utils.dataset as ds
+
     ds.hf_load_dataset = fake_hf_load_dataset
 
     d = load_dataset("my-dataset/name")
