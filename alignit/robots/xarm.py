@@ -30,6 +30,9 @@ class Xarm(Robot):
     def send_action(self, action):
         self.robot.send_action(action)
 
+    def get_intrinsics(self):
+        return self.camera.get_intrinsics()
+
     def get_observation(self):
         rgb_image, depth_image, acquisition_time = self.camera.async_read()
 

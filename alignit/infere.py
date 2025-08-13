@@ -8,7 +8,7 @@ from alignit.models.alignnet import AlignNet
 from alignit.utils.zhou import sixd_se3
 from alignit.utils.tfs import print_pose, are_tfs_close
 from alignit.robots.xarmsim import XarmSim
-from alignit.robots.xarm import Xarm
+
 
 @draccus.wrap()
 def main(cfg: InferConfig):
@@ -35,7 +35,7 @@ def main(cfg: InferConfig):
     start_pose = t3d.affines.compose(
         [0.23, 0, 0.25], t3d.euler.euler2mat(np.pi, 0, 0), [1, 1, 1]
     )
-    robot.servo_to_pose(start_pose, lin_tol=1e-2)   
+    robot.servo_to_pose(start_pose, lin_tol=1e-2)
     iteration = 0
     iterations_within_tolerance = 0
     ang_tol_rad = np.deg2rad(cfg.ang_tolerance)
@@ -47,7 +47,7 @@ def main(cfg: InferConfig):
             rgb_image_tensor = (
                 torch.from_numpy(np.array(rgb_image))
                 .permute(2, 0, 1)  # (H, W, C) -> (C, H, W)
-                .unsqueeze(0)  
+                .unsqueeze(0)
                 .to(device)
             )
 
@@ -61,7 +61,6 @@ def main(cfg: InferConfig):
             rgb_images_batch = rgb_image_tensor.unsqueeze(1)
             depth_images_batch = depth_image_tensor.unsqueeze(1)
 
-
             with torch.no_grad():
                 relative_action = net(rgb_images_batch, depth_images=depth_images_batch)
             relative_action = relative_action.squeeze(0).cpu().numpy()
@@ -70,7 +69,9 @@ def main(cfg: InferConfig):
             if cfg.debug_output:
                 print_pose(relative_action)
 
-            relative_action[:3, :3] = np.linalg.matrix_power(relative_action[:3, :3], cfg.num_multiplications)
+            relative_action[:3, :3] = np.linalg.matrix_power(
+                relative_action[:3, :3], cfg.rotation_matrix_multiplier
+            )
 
             # Check convergence
             if are_tfs_close(
@@ -102,5 +103,7 @@ def main(cfg: InferConfig):
         print("\nExiting...")
 
     robot.disconnect()
+
+
 if __name__ == "__main__":
     main()

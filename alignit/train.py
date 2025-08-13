@@ -6,6 +6,7 @@ from tqdm import tqdm
 from datasets import load_from_disk
 from torchvision import transforms
 import draccus
+import numpy as np
 
 from alignit.config import TrainConfig
 from alignit.models.alignnet import AlignNet
@@ -15,7 +16,11 @@ def collate_fn(batch):
     images = [item["images"] for item in batch]
     depth_images = [item.get("depth", None) for item in batch]
     actions = [item["action"] for item in batch]
-    return {"images": images, "depth_images": depth_images, "action": torch.tensor(actions, dtype=torch.float32)}
+    return {
+        "images": images,
+        "depth_images": depth_images,
+        "action": torch.tensor(actions, dtype=torch.float32),
+    }
 
 
 @draccus.wrap()
@@ -31,6 +36,7 @@ def main(cfg: TrainConfig):
         vector_hidden_dim=cfg.model.vector_hidden_dim,
         output_dim=cfg.model.output_dim,
         feature_agg=cfg.model.feature_agg,
+        use_depth_input=cfg.model.use_depth_input,
     ).to(device)
 
     train_dataset = dataset.train_test_split(
@@ -46,6 +52,7 @@ def main(cfg: TrainConfig):
     optimizer = Adam(net.parameters(), lr=cfg.learning_rate)
     criterion = MSELoss()
     net.train()
+
     for epoch in range(cfg.epochs):
         for batch in tqdm(train_loader, desc=f"Epoch {epoch+1}"):
             images = batch["images"]
@@ -53,40 +60,54 @@ def main(cfg: TrainConfig):
             actions = batch["action"].to(device)
 
             batch_rgb_tensors = []
-            batch_depth_tensors = []
-            rgb_transform = transforms.Compose([transforms.ToTensor()])
-            depth_transform = transforms.Compose([transforms.ToTensor()])
+            rgb_transform = transforms.Compose(
+                [
+                    transforms.ToTensor(),
+                ]
+            )
 
-            for i, image_sequence in enumerate(images):
-                # Process RGB
+            for image_sequence in images:
                 tensor_sequence_rgb = [
                     rgb_transform(img.convert("RGB")) for img in image_sequence
                 ]
                 stacked_tensors_rgb = torch.stack(tensor_sequence_rgb, dim=0)
                 batch_rgb_tensors.append(stacked_tensors_rgb)
 
-                # Process Depth
-                if depth_images_pil[i] is not None: # Check if depth is actually present for this item
-                    depth_sequence = depth_images_pil[i]
-                    tensor_sequence_depth = [
-                        depth_transform(d_img.convert("L")) for d_img in depth_sequence
-                    ] 
-                    stacked_tensors_depth = torch.stack(tensor_sequence_depth, dim=0)
-                    batch_depth_tensors.append(stacked_tensors_depth)
-                else:
-                    print(f"Warning: Depth image missing for sample {i} in batch.")
-                    raise ValueError("Depth images expected but not found for a sample when use_depth is True.")
-
-
             batch_rgb_tensors = torch.stack(batch_rgb_tensors, dim=0).to(device)
-            batch_depth_tensors = torch.stack(batch_depth_tensors, dim=0).to(device)
+
+            batch_depth_tensors = None
+            if cfg.model.use_depth_input:
+                batch_depth_tensors = []
+                for depth_sequence in depth_images_pil:
+                    if depth_sequence is None:
+                        raise ValueError(
+                            "Depth images expected but not found when use_depth_input=True"
+                        )
+
+                    depth_sequence_processed = []
+                    for d_img in depth_sequence:
+                        depth_array = np.array(d_img) / 1000.0
+                        depth_tensor = torch.from_numpy(depth_array).float()
+                        depth_tensor = depth_tensor.unsqueeze(0)
+                        depth_sequence_processed.append(depth_tensor)
+
+                    stacked_depth = torch.stack(depth_sequence_processed, dim=0)
+                    batch_depth_tensors.append(stacked_depth)
+
+                batch_depth_tensors = torch.stack(batch_depth_tensors, dim=0).to(device)
 
             optimizer.zero_grad()
-            outputs = net(batch_rgb_tensors, depth_images=batch_depth_tensors)
+            if cfg.model.use_depth_input:
+                outputs = net(batch_rgb_tensors, depth_images=batch_depth_tensors)
+            else:
+                outputs = net(batch_rgb_tensors)
+
             loss = criterion(outputs, actions)
             loss.backward()
             optimizer.step()
+
             tqdm.write(f"Loss: {loss.item():.4f}")
+
         torch.save(net.state_dict(), cfg.model.path)
         tqdm.write(f"Model saved as {cfg.model.path}")
 
@@ -95,4 +116,3 @@ def main(cfg: TrainConfig):
 
 if __name__ == "__main__":
     main()
-

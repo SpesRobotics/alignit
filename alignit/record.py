@@ -18,6 +18,7 @@ from datasets import (
     concatenate_datasets,
 )
 
+
 def generate_spiral_trajectory(start_pose, cfg):
     """Generate spiral trajectory using configuration parameters."""
     trajectory = []
@@ -73,12 +74,17 @@ def generate_spiral_trajectory(start_pose, cfg):
 
     return trajectory
 
+
 @draccus.wrap()
 def main(cfg: RecordConfig):
     """Record alignment dataset using configuration parameters."""
-    robot = XarmSim()
+    robot = Xarm()
     features = Features(
-        {"images": Sequence(Image()), "action": Sequence(Value("float32")), "depth": Sequence(Image())}
+        {
+            "images": Sequence(Image()),
+            "action": Sequence(Value("float32")),
+            "depth": Sequence(Image()),
+        }
     )
 
     for episode in range(cfg.episodes):
@@ -92,25 +98,28 @@ def main(cfg: RecordConfig):
             ang_tol=cfg.ang_tol_alignment,
         )
         trajectory = generate_spiral_trajectory(pose_start, cfg.trajectory)
-    
-        print(f"Generated trajectory with {len(trajectory)} poses for episode {episode+1}",flush=True)
+
+        print(
+            f"Generated trajectory with {len(trajectory)} poses for episode {episode+1}",
+            flush=True,
+        )
         frames = []
         for pose in trajectory:
-                robot.servo_to_pose(
-                    pose, lin_tol=cfg.lin_tol_trajectory, ang_tol=cfg.ang_tol_trajectory
-                )
-                current_pose = robot.pose()
+            robot.servo_to_pose(
+                pose, lin_tol=cfg.lin_tol_trajectory, ang_tol=cfg.ang_tol_trajectory
+            )
+            current_pose = robot.pose()
 
-                action_pose = np.linalg.inv(current_pose) @ pose_alignment_target
-                action_sixd = se3_sixd(action_pose)
+            action_pose = np.linalg.inv(current_pose) @ pose_alignment_target
+            action_sixd = se3_sixd(action_pose)
 
-                observation = robot.get_observation()
-                frame = {
-                    "images": [observation["camera.rgb"].copy()],
-                    "action": action_sixd,
-                    "depth": [observation["camera.rgb.depth"].copy()],
-                }
-                frames.append(frame)
+            observation = robot.get_observation()
+            frame = {
+                "images": [observation["camera.rgb"].copy()],
+                "action": action_sixd,
+                "depth": [observation["camera.rgb.depth"].copy()],
+            }
+            frames.append(frame)
         print(f"Episode {episode+1} completed with {len(frames)} frames.")
 
         episode_dataset = Dataset.from_list(frames, features=features)

@@ -40,16 +40,16 @@ class AlignNet(nn.Module):
         self.image_fc = nn.Sequential(
             nn.Linear(self.image_feature_dim, fc_layers[0]), nn.ReLU()
         )
-        
+
         if use_depth_input:
             self.depth_cnn = nn.Sequential(
-                nn.Conv2d(1, 8, 3, padding=1), nn.ReLU(),
-                nn.Conv2d(8, 16, 3, padding=1), nn.ReLU(),
+                nn.Conv2d(1, 8, 3, padding=1),
+                nn.ReLU(),
+                nn.Conv2d(8, 16, 3, padding=1),
+                nn.ReLU(),
                 nn.AdaptiveAvgPool2d(1),
             )
-            self.depth_fc = nn.Sequential(
-                nn.Linear(16, depth_hidden_dim), nn.ReLU()
-            )
+            self.depth_fc = nn.Sequential(nn.Linear(16, depth_hidden_dim), nn.ReLU())
             input_dim = fc_layers[0] + depth_hidden_dim
         else:
             input_dim = fc_layers[0]

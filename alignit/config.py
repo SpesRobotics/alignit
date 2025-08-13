@@ -47,8 +47,7 @@ class ModelConfig:
         metadata={"help": "Path to save/load trained model"},
     )
     use_depth_input: bool = field(
-        default=True, 
-        metadata={"help": "Whether to use depth input for the model"}
+        default=True, metadata={"help": "Whether to use depth input for the model"}
     )
     depth_hidden_dim: int = field(
         default=128, metadata={"help": "Output dimension of depth CNN"}
@@ -156,10 +155,11 @@ class InferConfig:
         default=5,
         metadata={"help": "Number of iterations within tolerance before stopping"},
     )
-    num_multiplications: int = field(
+    rotation_matrix_multiplier: int = field(
         default=3,
         metadata={
-            "help": "Number of times to multiply the transformation matrix"},
+            "help": "Number of times to multiply the rotation matrix of relative action in order to speed up convergence"
+        },
     )
 
 

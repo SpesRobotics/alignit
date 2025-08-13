@@ -22,7 +22,11 @@ def visualize(cfg: VisualizeConfig):
     gr.Interface(
         fn=get_data,
         inputs=gr.Slider(0, len(dataset) - 1, step=1, label="Index", interactive=True),
-        outputs=[gr.Image(type="pil", label="Image"), gr.Image(type="pil", label="Depth Image"), gr.Text(label="Label")],
+        outputs=[
+            gr.Image(type="pil", label="Image"),
+            gr.Image(type="pil", label="Depth Image"),
+            gr.Text(label="Label"),
+        ],
         title="Dataset Image Viewer",
         live=True,
     ).launch(share=cfg.share, server_name=cfg.server_name, server_port=cfg.server_port)
