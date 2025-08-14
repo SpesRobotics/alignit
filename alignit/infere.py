@@ -45,11 +45,15 @@ def main(cfg: InferConfig):
         while True:
             observation = robot.get_observation()
             rgb_image = observation["rgb"].astype(np.float32) / 255.0
-            depth_image_unscaled= observation["depth"].astype(np.float32) 
+            depth_image_unscaled = observation["depth"].astype(np.float32)
             depth_image_unscaled = np.clip(depth_image_unscaled, a_min=None, a_max=1000)
 
             depth_image = depth_image_unscaled / 1000.0  # Scale depth to meters
-            print("Min/Max depth (raw):", observation["depth"].min(), observation["depth"].max())
+            print(
+                "Min/Max depth (raw):",
+                observation["depth"].min(),
+                observation["depth"].max(),
+            )
             print("Min/Max depth (scaled):", depth_image.min(), depth_image.max())
             rgb_image_tensor = (
                 torch.from_numpy(np.array(rgb_image))
@@ -84,8 +88,6 @@ def main(cfg: InferConfig):
                 iterations_within_tolerance += 1
             else:
                 iterations_within_tolerance = 0
-
-            
 
             print(relative_action)
             target_pose = robot.pose() @ relative_action
