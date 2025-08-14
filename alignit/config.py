@@ -112,7 +112,7 @@ class TrainConfig:
 
     dataset: DatasetConfig = field(default_factory=DatasetConfig)
     model: ModelConfig = field(default_factory=ModelConfig)
-    batch_size: int = field(default=8, metadata={"help": "Training batch size"})
+    batch_size: int = field(default=4, metadata={"help": "Training batch size"})
     learning_rate: float = field(
         default=1e-4, metadata={"help": "Learning rate for optimizer"}
     )
@@ -139,10 +139,10 @@ class InferConfig:
         metadata={"help": "Starting pose RPY angles"},
     )
     lin_tolerance: float = field(
-        default=2e-3, metadata={"help": "Linear tolerance for convergence (meters)"}
+        default=5e-3, metadata={"help": "Linear tolerance for convergence (meters)"}
     )
     ang_tolerance: float = field(
-        default=2, metadata={"help": "Angular tolerance for convergence (degrees)"}
+        default=5, metadata={"help": "Angular tolerance for convergence (degrees)"}
     )
     max_iterations: Optional[int] = field(
         default=None,

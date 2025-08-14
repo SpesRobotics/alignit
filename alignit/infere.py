@@ -8,6 +8,7 @@ from alignit.models.alignnet import AlignNet
 from alignit.utils.zhou import sixd_se3
 from alignit.utils.tfs import print_pose, are_tfs_close
 from alignit.robots.xarmsim import XarmSim
+from alignit.robots.xarm import Xarm
 
 
 @draccus.wrap()
@@ -30,7 +31,7 @@ def main(cfg: InferConfig):
     net.to(device)
     net.eval()
 
-    robot = XarmSim()
+    robot = Xarm()
 
     start_pose = t3d.affines.compose(
         [0.23, 0, 0.25], t3d.euler.euler2mat(np.pi, 0, 0), [1, 1, 1]
@@ -39,11 +40,12 @@ def main(cfg: InferConfig):
     iteration = 0
     iterations_within_tolerance = 0
     ang_tol_rad = np.deg2rad(cfg.ang_tolerance)
+    print("beforee")
     try:
         while True:
             observation = robot.get_observation()
-            rgb_image = observation["camera.rgb"].astype(np.float32) / 255.0
-            depth_image = observation["camera.rgb.depth"].astype(np.float32) / 1000.0
+            rgb_image = observation["rgb"].astype(np.float32) / 255.0
+            depth_image = observation["depth"].astype(np.float32) / 1000.0
             rgb_image_tensor = (
                 torch.from_numpy(np.array(rgb_image))
                 .permute(2, 0, 1)  # (H, W, C) -> (C, H, W)
@@ -57,7 +59,6 @@ def main(cfg: InferConfig):
                 .unsqueeze(0)  # Add batch dimension: (1, 1, H, W)
                 .to(device)
             )
-
             rgb_images_batch = rgb_image_tensor.unsqueeze(1)
             depth_images_batch = depth_image_tensor.unsqueeze(1)
 
@@ -72,8 +73,6 @@ def main(cfg: InferConfig):
             relative_action[:3, :3] = np.linalg.matrix_power(
                 relative_action[:3, :3], cfg.rotation_matrix_multiplier
             )
-
-            # Check convergence
             if are_tfs_close(
                 relative_action, lin_tol=cfg.lin_tolerance, ang_tol=ang_tol_rad
             ):
@@ -84,7 +83,8 @@ def main(cfg: InferConfig):
             if iterations_within_tolerance >= cfg.debouncing_count:
                 print("Alignment achieved - stopping.")
                 break
-
+            
+            print(relative_action)
             target_pose = robot.pose() @ relative_action
             iteration += 1
             action = {
@@ -92,7 +92,6 @@ def main(cfg: InferConfig):
                 "gripper.pos": 1.0,
             }
             robot.send_action(action)
-
             # Check max iterations
             if cfg.max_iterations and iteration >= cfg.max_iterations:
                 print(f"Reached maximum iterations ({cfg.max_iterations}) - stopping.")
