@@ -115,6 +115,8 @@ class RealSenseCamera(Camera):
         self.latest_frame_acquisition_time = None
         self.rs_pipeline: rs.pipeline | None = None
         self.rs_profile: rs.pipeline_profile | None = None
+        self.align = rs.align(rs.stream.color)
+
 
         self.thread: Thread | None = None
         self.stop_event: Event | None = None
@@ -473,9 +475,7 @@ class RealSenseCamera(Camera):
                 depth_image = self.read_depth(timeout_ms=500)
 
                 with self.frame_lock:
-                    self.latest_frame = color_image
-                    self.latest_frame_depth = depth_image
-                    self.latest_frame_acquisition_time = time.time()
+                    self.latest_frame = color_image , depth_image
                 self.new_frame_event.set()
 
             except DeviceNotConnectedError:
