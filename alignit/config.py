@@ -104,6 +104,13 @@ class RecordConfig:
     ang_tol_trajectory: float = field(
         default=0.05, metadata={"help": "Angular tolerance for trajectory servo"}
     )
+    manual_height: float = field(
+        default=-0.05, metadata={"help": "Height above surface for manual movement"}
+    )
+    world_z_offset: float = field(
+        default=-0.02,
+        metadata={"help": "World frame Z offset after manual positioning"},
+    )
 
 
 @dataclass
@@ -145,14 +152,14 @@ class InferConfig:
         default=5, metadata={"help": "Angular tolerance for convergence (degrees)"}
     )
     max_iterations: Optional[int] = field(
-        default=None,
+        default=20,
         metadata={"help": "Maximum iterations before stopping (None = infinite)"},
     )
     debug_output: bool = field(
         default=True, metadata={"help": "Print debug information during inference"}
     )
     debouncing_count: int = field(
-        default=5,
+        default=20,
         metadata={"help": "Number of iterations within tolerance before stopping"},
     )
     rotation_matrix_multiplier: int = field(
@@ -161,6 +168,10 @@ class InferConfig:
             "help": "Number of times to multiply the rotation matrix of relative action in order to speed up convergence"
         },
     )
+    manual_height: float = field(
+        default=0.08, metadata={"help": "Height above surface for manual movement"}
+    )
+    
 
 
 @dataclass

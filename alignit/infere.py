@@ -3,6 +3,7 @@ import numpy as np
 import time
 import draccus
 from alignit.config import InferConfig
+from alignit.config import RecordConfig
 import torch
 from alignit.models.alignnet import AlignNet
 from alignit.utils.zhou import sixd_se3
@@ -40,7 +41,6 @@ def main(cfg: InferConfig):
     iteration = 0
     iterations_within_tolerance = 0
     ang_tol_rad = np.deg2rad(cfg.ang_tolerance)
-    print("beforee")
     try:
         while True:
             observation = robot.get_observation()
@@ -50,11 +50,17 @@ def main(cfg: InferConfig):
 
             depth_image = depth_image_unscaled / 1000.0  # Scale depth to meters
             print(
-                "Min/Max depth (raw):",
+                "Min/Max depth,mean (raw):",
                 observation["depth"].min(),
                 observation["depth"].max(),
+                observation["depth"].mean(),
             )
-            print("Min/Max depth (scaled):", depth_image.min(), depth_image.max())
+            print(
+                "Min/Max depth,mean (scaled):",
+                depth_image.min(),
+                depth_image.max(),
+                depth_image.mean(),
+            )
             rgb_image_tensor = (
                 torch.from_numpy(np.array(rgb_image))
                 .permute(2, 0, 1)  # (H, W, C) -> (C, H, W)
@@ -97,9 +103,19 @@ def main(cfg: InferConfig):
                 "gripper.pos": 1.0,
             }
             robot.send_action(action)
-            # Check max iterations
-            if cfg.max_iterations and iteration >= cfg.max_iterations:
+            if iterations_within_tolerance >= cfg.max_iterations:
                 print(f"Reached maximum iterations ({cfg.max_iterations}) - stopping.")
+                print("Moving robot to final pose.")
+                current_pose = robot.pose()
+                gripper_z_offset = np.array(
+                    [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, cfg.manual_height], [0, 0, 0, 1]]
+                      )
+                offset_pose = current_pose @ gripper_z_offset
+                robot.servo_to_pose(pose=offset_pose)
+                robot.close_gripper()
+                robot.gripper_off()
+                
+
                 break
 
         time.sleep(10.0)

@@ -86,7 +86,10 @@ def main(cfg: TrainConfig):
 
                     depth_sequence_processed = []
                     for d_img in depth_sequence:
-                        depth_array = np.array(d_img) / 1000.0
+                        depth_array_clipped = np.clip(
+                            np.array(d_img), a_min=0, a_max=1000
+                        )
+                        depth_array = np.array(depth_array_clipped) / 1000.0
                         depth_tensor = torch.from_numpy(depth_array).float()
                         depth_tensor = depth_tensor.unsqueeze(0)
                         depth_sequence_processed.append(depth_tensor)
@@ -95,6 +98,12 @@ def main(cfg: TrainConfig):
                     batch_depth_tensors.append(stacked_depth)
 
                 batch_depth_tensors = torch.stack(batch_depth_tensors, dim=0).to(device)
+                print(
+                    "Min,max,mean depth:",
+                    batch_depth_tensors.min().item(),
+                    batch_depth_tensors.max().item(),
+                    batch_depth_tensors.mean().item(),
+                )
 
             optimizer.zero_grad()
             if cfg.model.use_depth_input:
