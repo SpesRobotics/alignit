@@ -171,7 +171,6 @@ class InferConfig:
     manual_height: float = field(
         default=0.08, metadata={"help": "Height above surface for manual movement"}
     )
-    
 
 
 @dataclass

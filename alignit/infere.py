@@ -45,10 +45,7 @@ def main(cfg: InferConfig):
         while True:
             observation = robot.get_observation()
             rgb_image = observation["rgb"].astype(np.float32) / 255.0
-            depth_image_unscaled = observation["depth"].astype(np.float32)
-            depth_image_unscaled = np.clip(depth_image_unscaled, a_min=None, a_max=1000)
-
-            depth_image = depth_image_unscaled / 1000.0  # Scale depth to meters
+            depth_image = observation["depth"].astype(np.float32)
             print(
                 "Min/Max depth,mean (raw):",
                 observation["depth"].min(),
@@ -108,13 +105,17 @@ def main(cfg: InferConfig):
                 print("Moving robot to final pose.")
                 current_pose = robot.pose()
                 gripper_z_offset = np.array(
-                    [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, cfg.manual_height], [0, 0, 0, 1]]
-                      )
+                    [
+                        [1, 0, 0, 0],
+                        [0, 1, 0, 0],
+                        [0, 0, 1, cfg.manual_height],
+                        [0, 0, 0, 1],
+                    ]
+                )
                 offset_pose = current_pose @ gripper_z_offset
                 robot.servo_to_pose(pose=offset_pose)
                 robot.close_gripper()
                 robot.gripper_off()
-                
 
                 break
 

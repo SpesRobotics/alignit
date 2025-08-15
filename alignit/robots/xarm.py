@@ -36,9 +36,7 @@ class Xarm(Robot):
 
     def get_observation(self):
         rgb_image, depth_image, acquisition_time = self.camera.async_read()
-        depth_array_clipped = np.clip(
-        np.array(depth_image), a_min=0, a_max=1000
-                        )
+        depth_array_clipped = np.clip(np.array(depth_image), a_min=0, a_max=1000)
         depth_image = np.array(depth_array_clipped) / 1000.0
 
         return {
@@ -57,6 +55,7 @@ class Xarm(Robot):
             }
             self.send_action(action)
             time.sleep(1.0 / 60.0)
+
     def close_gripper(self):
         action = {
             "pose": self.pose(),
