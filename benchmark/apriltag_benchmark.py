@@ -1,13 +1,12 @@
 import cv2
 import numpy as np
 from pupil_apriltags import Detector
-from alignit.robots.xarm import Xarm
-import os
-import time
 from scipy.spatial.transform import Rotation as R
 
+from alignit.robots.xarm import Xarm
 
-class Evaluation:
+
+class AprilTagBenchmark:
     def __init__(self, tag_size=0.06):
         camera_params = robot.get_intrinsics()
         self.detector = Detector(families="tag36h11")
@@ -86,7 +85,7 @@ def pose_in_tag_frame(tag_pose_world, robot_pose_world):
 
 if __name__ == "__main__":
     robot = Xarm()
-    detector = Evaluation()
+    detector = AprilTagBenchmark()
     while True:
         observation = robot.get_observation()
         curr_pose = robot.pose()

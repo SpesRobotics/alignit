@@ -125,10 +125,10 @@ class XarmSim(Robot):
                 self.data.qvel[qvel_adr : qvel_adr + 6] = 0
         mj.mj_forward(self.model, self.data)
 
-    def _gripper_close(self):
+    def close_gripper(self):
         self._set_gripper_position(self.gripper_close_pos)
 
-    def _gripper_open(self):
+    def open_gripper(self):
         self._set_gripper_position(self.gripper_open_pos)
 
     def _set_gripper_position(self, pos, tolerance=1e-3, max_sim_steps=2000):
@@ -195,8 +195,10 @@ class XarmSim(Robot):
             self.renderer.update_scene(self.data, camera=name)
             image_depth = self.renderer.render()
             self.renderer.disable_depth_rendering()
-            obs["camera." + name] = image[:, :, ::-1]
-            obs["camera." + name + ".depth"] = image_depth
+
+            # TODO: Handle multiple cameras
+            obs["rgb"] = image[:, :, ::-1]
+            obs["depth"] = image_depth
 
         return obs
 

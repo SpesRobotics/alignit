@@ -1,10 +1,11 @@
+import time
+
+import torch
 import transforms3d as t3d
 import numpy as np
-import time
 import draccus
+
 from alignit.config import InferConfig
-from alignit.config import RecordConfig
-import torch
 from alignit.models.alignnet import AlignNet
 from alignit.utils.zhou import sixd_se3
 from alignit.utils.tfs import print_pose, are_tfs_close
@@ -32,7 +33,7 @@ def main(cfg: InferConfig):
     net.to(device)
     net.eval()
 
-    robot = Xarm()
+    robot = XarmSim()
 
     start_pose = t3d.affines.compose(
         [0.23, 0, 0.25], t3d.euler.euler2mat(np.pi, 0, 0), [1, 1, 1]

@@ -1,13 +1,9 @@
 import os
 import shutil
+
 import transforms3d as t3d
 import numpy as np
 from scipy.spatial.transform import Rotation as R
-from alignit.robots.xarm import Xarm
-from alignit.utils.zhou import se3_sixd
-import draccus
-from alignit.config import RecordConfig
-from alignit.robots.xarmsim import XarmSim
 from datasets import (
     Dataset,
     Features,
@@ -17,7 +13,12 @@ from datasets import (
     load_from_disk,
     concatenate_datasets,
 )
-import time
+
+from alignit.robots.xarmsim import XarmSim
+from alignit.robots.xarm import Xarm
+from alignit.utils.zhou import se3_sixd
+import draccus
+from alignit.config import RecordConfig
 
 
 def generate_spiral_trajectory(start_pose, cfg):
@@ -79,7 +80,7 @@ def generate_spiral_trajectory(start_pose, cfg):
 @draccus.wrap()
 def main(cfg: RecordConfig):
     """Record alignment dataset using configuration parameters."""
-    robot = Xarm()
+    robot = XarmSim()
     features = Features(
         {
             "images": Sequence(Image()),

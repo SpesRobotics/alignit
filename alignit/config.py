@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass, field
 from typing import Optional, List
+
 import numpy as np
 
 
@@ -10,7 +11,7 @@ class DatasetConfig:
     """Configuration for dataset paths and loading."""
 
     path: str = field(
-        default="./data/duck", metadata={"help": "Path to the dataset directory"}
+        default="./data/default", metadata={"help": "Path to the dataset directory"}
     )
 
 

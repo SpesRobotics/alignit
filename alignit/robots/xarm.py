@@ -1,9 +1,11 @@
 import time
+
+import numpy as np
+import transforms3d as t3d
 from lerobot.cameras.realsense import RealSenseCamera, RealSenseCameraConfig
 from lerobot_xarm.xarm import Xarm as LeXarm
 from lerobot_xarm.config import XarmConfig
-import numpy as np
-import transforms3d as t3d
+
 from alignit.robots.robot import Robot
 from alignit.utils.tfs import are_tfs_close
 from alignit.config import RecordConfig
