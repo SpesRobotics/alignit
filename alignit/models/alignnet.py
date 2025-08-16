@@ -16,6 +16,7 @@ class AlignNet(nn.Module):
         depth_hidden_dim=128,
         output_dim=7,
         feature_agg="mean",
+        dropout: float | int = 0.0,
     ):
         """
         :param backbone_name: 'efficientnet_b0' or 'resnet18'
@@ -41,12 +42,25 @@ class AlignNet(nn.Module):
             nn.Linear(self.image_feature_dim, fc_layers[0]), nn.ReLU()
         )
 
+        # Optional attention vectors for view aggregation
+        if self.feature_agg == "attn":
+            # One learnable attention vector per modality
+            self.attn_vector_img = nn.Parameter(torch.randn(self.image_feature_dim))
+            # Depth features before FC are 16-dim in the tiny depth CNN below
+            self.attn_vector_depth = nn.Parameter(torch.randn(16))
+        else:
+            self.attn_vector_img = None
+            self.attn_vector_depth = None
+
         if use_depth_input:
+            # Lightweight depth encoder with BatchNorm for stability
             self.depth_cnn = nn.Sequential(
                 nn.Conv2d(1, 8, 3, padding=1),
-                nn.ReLU(),
+                nn.BatchNorm2d(8),
+                nn.ReLU(inplace=True),
                 nn.Conv2d(8, 16, 3, padding=1),
-                nn.ReLU(),
+                nn.BatchNorm2d(16),
+                nn.ReLU(inplace=True),
                 nn.AdaptiveAvgPool2d(1),
             )
             self.depth_fc = nn.Sequential(nn.Linear(16, depth_hidden_dim), nn.ReLU())
@@ -65,6 +79,8 @@ class AlignNet(nn.Module):
         for out_dim in fc_layers[1:]:
             layers.append(nn.Linear(in_dim, out_dim))
             layers.append(nn.ReLU())
+            if dropout and float(dropout) > 0:
+                layers.append(nn.Dropout(p=float(dropout)))
             in_dim = out_dim
         layers.append(nn.Linear(in_dim, output_dim))  # Final output layer
         self.head = nn.Sequential(*layers)
@@ -87,25 +103,43 @@ class AlignNet(nn.Module):
         else:
             raise ValueError(f"Unsupported backbone: {name}")
 
-    def aggregate_image_features(self, feats):
+    def aggregate_image_features(self, feats, modality: str = "img"):
+        """Aggregate view features across the view dimension.
+
+        feats: (B, N, D)
+        modality: 'img' or 'depth' (relevant for attention pooling)
+        """
         if self.feature_agg == "mean":
             return feats.mean(dim=1)
         elif self.feature_agg == "max":
             return feats.max(dim=1)[0]
+        elif self.feature_agg == "attn":
+            if modality == "img":
+                attn_vec = self.attn_vector_img
+            else:
+                attn_vec = self.attn_vector_depth
+            # Compute attention weights: (B, N)
+            # Normalize attn vector for stability
+            norm_attn = attn_vec / (attn_vec.norm(p=2) + 1e-6)
+            scores = torch.einsum("bnd,d->bn", feats, norm_attn)
+            weights = torch.softmax(scores, dim=1).unsqueeze(-1)  # (B, N, 1)
+            return (feats * weights).sum(dim=1)
         else:
             raise ValueError("Invalid aggregation type")
 
     def forward(self, rgb_images, vector_inputs=None, depth_images=None):
         """
         :param rgb_images: Tensor of shape (B, N, 3, H, W)
-        :param vector_inputs: List of tensors of shape (L_i,) or None
+        :param vector_inputs: List[Tensor(L_i,)] or Tensor(B, L) or Tensor(B, L, 1)
         :param depth_images: Tensor of shape (B, N, 1, H, W) or None
         :return: Tensor of shape (B, output_dim)
         """
         B, N, C, H, W = rgb_images.shape
-        images = rgb_images.view(B * N, C, H, W)
-        feats = self.backbone(images).view(B, N, -1)
-        image_feats = self.aggregate_image_features(feats)
+        images = rgb_images.reshape(B * N, C, H, W)
+        # Use channels_last to improve convolution performance
+        images = images.contiguous(memory_format=torch.channels_last)
+        feats = self.backbone(images).reshape(B, N, -1)
+        image_feats = self.aggregate_image_features(feats, modality="img")
         image_feats = self.image_fc(image_feats)
 
         features = [image_feats]
@@ -113,7 +147,7 @@ class AlignNet(nn.Module):
         if self.use_depth_input and depth_images is not None:
             depth = depth_images.view(B * N, 1, H, W)
             depth_feats = self.depth_cnn(depth).view(B, N, -1)
-            depth_feats = self.aggregate_image_features(depth_feats)
+            depth_feats = self.aggregate_image_features(depth_feats, modality="depth")
             depth_feats = self.depth_fc(depth_feats)
             features.append(depth_feats)
 
@@ -127,6 +161,4 @@ class AlignNet(nn.Module):
             features.append(vec_feats)
 
         fused = torch.cat(features, dim=1)
-        print("Fused shape:", fused.shape)
-
         return self.head(fused)  # (B, output_dim)

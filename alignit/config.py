@@ -41,7 +41,10 @@ class ModelConfig:
         metadata={"help": "Final output dimension (3 translation + 6 rotation)"},
     )
     feature_agg: str = field(
-        default="mean", metadata={"help": "Feature aggregation method: 'mean' or 'max'"}
+        default="mean",
+        metadata={
+            "help": "Feature aggregation method: 'mean', 'max', or 'attn' (attention)"
+        },
     )
     path: str = field(
         default="alignnet_model.pth",
@@ -52,6 +55,9 @@ class ModelConfig:
     )
     depth_hidden_dim: int = field(
         default=128, metadata={"help": "Output dimension of depth CNN"}
+    )
+    dropout: float = field(
+        default=0.0, metadata={"help": "Dropout probability in FC head (0 to disable)"}
     )
 
 
