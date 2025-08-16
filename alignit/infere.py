@@ -1,11 +1,11 @@
-import transforms3d as t3d
-import numpy as np
 import time
-import draccus
-from alignit.config import InferConfig
 
 import torch
+import transforms3d as t3d
+import numpy as np
+import draccus
 
+from alignit.config import InferConfig
 from alignit.models.alignnet import AlignNet
 from alignit.utils.zhou import sixd_se3
 from alignit.utils.tfs import print_pose, are_tfs_close
@@ -19,7 +19,6 @@ def main(cfg: InferConfig):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
-    # load model from file
     net = AlignNet(
         backbone_name=cfg.model.backbone,
         backbone_weights=cfg.model.backbone_weights,
@@ -28,6 +27,7 @@ def main(cfg: InferConfig):
         vector_hidden_dim=cfg.model.vector_hidden_dim,
         output_dim=cfg.model.output_dim,
         feature_agg=cfg.model.feature_agg,
+        use_depth_input=cfg.model.use_depth_input,
     )
     net.load_state_dict(torch.load(cfg.model.path, map_location=device))
     net.to(device)
@@ -35,42 +35,57 @@ def main(cfg: InferConfig):
 
     robot = XarmSim()
 
-    # Set initial pose from config
     start_pose = t3d.affines.compose(
         [0.23, 0, 0.25], t3d.euler.euler2mat(np.pi, 0, 0), [1, 1, 1]
     )
     robot.servo_to_pose(start_pose, lin_tol=1e-2)
-
     iteration = 0
     iterations_within_tolerance = 0
     ang_tol_rad = np.deg2rad(cfg.ang_tolerance)
-
     try:
         while True:
             observation = robot.get_observation()
-            images = [observation["camera.rgb"].astype(np.float32) / 255.0]
-
-            # Convert images to tensor and reshape from HWC to CHW format
-            images_tensor = (
-                torch.from_numpy(np.array(images))
-                .permute(0, 3, 1, 2)
+            rgb_image = observation["rgb"].astype(np.float32) / 255.0
+            depth_image = observation["depth"].astype(np.float32)
+            print(
+                "Min/Max depth,mean (raw):",
+                observation["depth"].min(),
+                observation["depth"].max(),
+                observation["depth"].mean(),
+            )
+            print(
+                "Min/Max depth,mean (scaled):",
+                depth_image.min(),
+                depth_image.max(),
+                depth_image.mean(),
+            )
+            rgb_image_tensor = (
+                torch.from_numpy(np.array(rgb_image))
+                .permute(2, 0, 1)  # (H, W, C) -> (C, H, W)
                 .unsqueeze(0)
                 .to(device)
             )
 
-            if cfg.debug_output:
-                print(f"Max pixel value: {torch.max(images_tensor)}")
+            depth_image_tensor = (
+                torch.from_numpy(np.array(depth_image))
+                .unsqueeze(0)  # Add channel dimension: (1, H, W)
+                .unsqueeze(0)  # Add batch dimension: (1, 1, H, W)
+                .to(device)
+            )
+            rgb_images_batch = rgb_image_tensor.unsqueeze(1)
+            depth_images_batch = depth_image_tensor.unsqueeze(1)
 
-            start = time.time()
             with torch.no_grad():
-                relative_action = net(images_tensor)
+                relative_action = net(rgb_images_batch, depth_images=depth_images_batch)
             relative_action = relative_action.squeeze(0).cpu().numpy()
             relative_action = sixd_se3(relative_action)
 
             if cfg.debug_output:
                 print_pose(relative_action)
 
-            # Check convergence
+            relative_action[:3, :3] = np.linalg.matrix_power(
+                relative_action[:3, :3], cfg.rotation_matrix_multiplier
+            )
             if are_tfs_close(
                 relative_action, lin_tol=cfg.lin_tolerance, ang_tol=ang_tol_rad
             ):
@@ -78,10 +93,7 @@ def main(cfg: InferConfig):
             else:
                 iterations_within_tolerance = 0
 
-            if iterations_within_tolerance >= cfg.debouncing_count:
-                print("Alignment achieved - stopping.")
-                break
-
+            print(relative_action)
             target_pose = robot.pose() @ relative_action
             iteration += 1
             action = {
@@ -89,14 +101,26 @@ def main(cfg: InferConfig):
                 "gripper.pos": 1.0,
             }
             robot.send_action(action)
-
-            # Check max iterations
-            if cfg.max_iterations and iteration >= cfg.max_iterations:
+            if iterations_within_tolerance >= cfg.max_iterations:
                 print(f"Reached maximum iterations ({cfg.max_iterations}) - stopping.")
+                print("Moving robot to final pose.")
+                current_pose = robot.pose()
+                gripper_z_offset = np.array(
+                    [
+                        [1, 0, 0, 0],
+                        [0, 1, 0, 0],
+                        [0, 0, 1, cfg.manual_height],
+                        [0, 0, 0, 1],
+                    ]
+                )
+                offset_pose = current_pose @ gripper_z_offset
+                robot.servo_to_pose(pose=offset_pose)
+                robot.close_gripper()
+                robot.gripper_off()
+
                 break
 
         time.sleep(10.0)
-
     except KeyboardInterrupt:
         print("\nExiting...")
 

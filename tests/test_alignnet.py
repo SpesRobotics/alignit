@@ -9,6 +9,7 @@ def test_alignnet_forward_shapes_cpu():
         backbone_weights=None,
         use_vector_input=False,
         output_dim=7,
+        use_depth_input=False,
     )
     model.eval()
     x = torch.randn(2, 3, 3, 64, 64)  # B=2, N=3 views
@@ -23,6 +24,7 @@ def test_alignnet_with_vector_input():
         backbone_weights=None,
         use_vector_input=True,
         output_dim=7,
+        use_depth_input=False,
     )
     model.eval()
     x = torch.randn(1, 2, 3, 64, 64)
@@ -38,6 +40,7 @@ def test_alignnet_performance():
         backbone_weights=None,
         use_vector_input=True,
         output_dim=7,
+        use_depth_input=False,
     )
     model.eval()
     x = torch.randn(1, 3, 3, 224, 224)  # B=1, N=3 views
@@ -53,3 +56,37 @@ def test_alignnet_performance():
         print(f"Forward pass took {elapsed_time_ms:.2f} ms")
 
     assert elapsed_time < 0.5
+
+
+def test_alignnet_with_depth_input():
+    model = AlignNet(
+        backbone_name="resnet18",
+        backbone_weights=None,
+        use_vector_input=False,
+        use_depth_input=True,
+        output_dim=7,
+    )
+    model.eval()
+    x = torch.randn(2, 3, 3, 64, 64)  # RGB images
+    depth = torch.randn(2, 3, 1, 64, 64)  # Depth images
+    with torch.no_grad():
+        y = model(x, depth_images=depth)
+    assert y.shape == (2, 7)
+
+
+def test_alignnet_with_all_inputs():
+    # New test for combined inputs
+    model = AlignNet(
+        backbone_name="efficientnet_b0",
+        backbone_weights=None,
+        use_vector_input=True,
+        use_depth_input=True,
+        output_dim=7,
+    )
+    model.eval()
+    x = torch.randn(1, 3, 3, 224, 224)  # RGB images
+    depth = torch.randn(1, 3, 1, 224, 224)  # Depth images
+    vecs = [torch.randn(5)]  # Vector inputs
+    with torch.no_grad():
+        y = model(x, vecs, depth)
+    assert y.shape == (1, 7)

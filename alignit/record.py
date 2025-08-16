@@ -82,22 +82,17 @@ def main(cfg: RecordConfig):
     """Record alignment dataset using configuration parameters."""
     robot = XarmSim()
     features = Features(
-        {"images": Sequence(Image()), "action": Sequence(Value("float32"))}
+        {
+            "images": Sequence(Image()),
+            "action": Sequence(Value("float32")),
+            "depth": Sequence(Image()),
+        }
     )
 
     for episode in range(cfg.episodes):
         pose_start, pose_alignment_target = robot.reset()
-
-        robot.servo_to_pose(pose_alignment_target, lin_tol=0.015, ang_tol=0.015)
-
-        robot.servo_to_pose(
-            pose_alignment_target,
-            lin_tol=cfg.lin_tol_alignment,
-            ang_tol=cfg.ang_tol_alignment,
-        )
-
         trajectory = generate_spiral_trajectory(pose_start, cfg.trajectory)
-
+        pose = robot.pose()
         frames = []
         for pose in trajectory:
             robot.servo_to_pose(
@@ -109,28 +104,33 @@ def main(cfg: RecordConfig):
             action_sixd = se3_sixd(action_pose)
 
             observation = robot.get_observation()
+            print(observation.keys())
             frame = {
-                "images": [observation["camera.rgb"].copy()],
+                "images": [observation["rgb"].copy()],
                 "action": action_sixd,
+                "depth": [observation["depth"].copy()],
             }
             frames.append(frame)
-
         print(f"Episode {episode+1} completed with {len(frames)} frames.")
 
         episode_dataset = Dataset.from_list(frames, features=features)
-        if episode == 0:
-            combined_dataset = episode_dataset
-        else:
-            previous_dataset = load_from_disk(cfg.dataset.path)
-            previous_dataset = previous_dataset.cast(features)
-            combined_dataset = concatenate_datasets([previous_dataset, episode_dataset])
-            del previous_dataset
 
+        # 2. Load existing dataset if available
+        if os.path.exists(cfg.dataset.path):
+            existing_dataset = load_from_disk(cfg.dataset.path)
+            existing_dataset = existing_dataset.cast(features)
+            combined_dataset = concatenate_datasets([existing_dataset, episode_dataset])
+        else:
+            combined_dataset = episode_dataset
+
+        # 3. Save to TEMPORARY location first (avoid self-overwrite)
         temp_path = f"{cfg.dataset.path}_temp"
         combined_dataset.save_to_disk(temp_path)
+
+        # 4. Atomic replacement (only after successful save)
         if os.path.exists(cfg.dataset.path):
-            shutil.rmtree(cfg.dataset.path)
-        shutil.move(temp_path, cfg.dataset.path)
+            shutil.rmtree(cfg.dataset.path)  # Remove old version
+        shutil.move(temp_path, cfg.dataset.path)  # Move new version into place
 
     robot.disconnect()
 

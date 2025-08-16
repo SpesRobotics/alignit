@@ -104,7 +104,7 @@
                       diaginertia="0.00016117 0.000118 0.00014455" />
                     <geom name="gripper_lite_body" class="visual" mesh="gripper_lite_body" material="white"/>
                     <geom name="gripper_lite_body_c" class="collision" mesh="gripper_lite_body_c"/>
-                    <camera name="rgb" mode="fixed" pos="0.1 0 -0.02" quat="0.0 0 1 0" fovy="90"/>
+                    <camera name="gripper" mode="fixed" pos="0.1 0 -0.02" quat="0.0 0 1 0" fovy="90"/>
                     <body name="gripper_left_finger" pos="0 0 0.054" quat="1 0 0 0">
                       <inertial pos="0.0 -0.005 0.01" quat="1 0 0 0" mass="0.024"
                         diaginertia="1.961e-6 2.274e-6 1.238e-6" />

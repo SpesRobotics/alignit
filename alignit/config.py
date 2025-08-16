@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass, field
 from typing import Optional, List
+
 import numpy as np
 
 
@@ -10,7 +11,7 @@ class DatasetConfig:
     """Configuration for dataset paths and loading."""
 
     path: str = field(
-        default="./data/duck", metadata={"help": "Path to the dataset directory"}
+        default="./data/default", metadata={"help": "Path to the dataset directory"}
     )
 
 
@@ -45,6 +46,12 @@ class ModelConfig:
     path: str = field(
         default="alignnet_model.pth",
         metadata={"help": "Path to save/load trained model"},
+    )
+    use_depth_input: bool = field(
+        default=True, metadata={"help": "Whether to use depth input for the model"}
+    )
+    depth_hidden_dim: int = field(
+        default=128, metadata={"help": "Output dimension of depth CNN"}
     )
 
 
@@ -98,6 +105,13 @@ class RecordConfig:
     ang_tol_trajectory: float = field(
         default=0.05, metadata={"help": "Angular tolerance for trajectory servo"}
     )
+    manual_height: float = field(
+        default=-0.05, metadata={"help": "Height above surface for manual movement"}
+    )
+    world_z_offset: float = field(
+        default=-0.02,
+        metadata={"help": "World frame Z offset after manual positioning"},
+    )
 
 
 @dataclass
@@ -106,7 +120,7 @@ class TrainConfig:
 
     dataset: DatasetConfig = field(default_factory=DatasetConfig)
     model: ModelConfig = field(default_factory=ModelConfig)
-    batch_size: int = field(default=8, metadata={"help": "Training batch size"})
+    batch_size: int = field(default=4, metadata={"help": "Training batch size"})
     learning_rate: float = field(
         default=1e-4, metadata={"help": "Learning rate for optimizer"}
     )
@@ -133,21 +147,30 @@ class InferConfig:
         metadata={"help": "Starting pose RPY angles"},
     )
     lin_tolerance: float = field(
-        default=2e-3, metadata={"help": "Linear tolerance for convergence (meters)"}
+        default=5e-3, metadata={"help": "Linear tolerance for convergence (meters)"}
     )
     ang_tolerance: float = field(
-        default=2, metadata={"help": "Angular tolerance for convergence (degrees)"}
+        default=5, metadata={"help": "Angular tolerance for convergence (degrees)"}
     )
     max_iterations: Optional[int] = field(
-        default=None,
+        default=20,
         metadata={"help": "Maximum iterations before stopping (None = infinite)"},
     )
     debug_output: bool = field(
         default=True, metadata={"help": "Print debug information during inference"}
     )
     debouncing_count: int = field(
-        default=5,
+        default=20,
         metadata={"help": "Number of iterations within tolerance before stopping"},
+    )
+    rotation_matrix_multiplier: int = field(
+        default=3,
+        metadata={
+            "help": "Number of times to multiply the rotation matrix of relative action in order to speed up convergence"
+        },
+    )
+    manual_height: float = field(
+        default=0.08, metadata={"help": "Height above surface for manual movement"}
     )
 
 
