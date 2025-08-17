@@ -41,7 +41,7 @@ class ModelConfig:
         metadata={"help": "Final output dimension (3 translation + 6 rotation)"},
     )
     feature_agg: str = field(
-        default="mean",
+        default="attn",
         metadata={
             "help": "Feature aggregation method: 'mean', 'max', or 'attn' (attention)"
         },
@@ -57,7 +57,7 @@ class ModelConfig:
         default=128, metadata={"help": "Output dimension of depth CNN"}
     )
     dropout: float = field(
-        default=0.0, metadata={"help": "Dropout probability in FC head (0 to disable)"}
+        default=0.1, metadata={"help": "Dropout probability in FC head (0 to disable)"}
     )
 
 
