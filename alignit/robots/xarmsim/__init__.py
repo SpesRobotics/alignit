@@ -199,6 +199,7 @@ class XarmSim(Robot):
             # TODO: Handle multiple cameras
             obs["rgb"] = image[:, :, ::-1]
             obs["depth"] = image_depth
+            obs["depth"] = np.clip(obs["depth"], 0, 1)
 
         return obs
 

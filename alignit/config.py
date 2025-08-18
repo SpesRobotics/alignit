@@ -72,7 +72,7 @@ class TrajectoryConfig:
         default=0.001, metadata={"help": "Radius step size for spiral trajectory"}
     )
     num_steps: int = field(
-        default=50, metadata={"help": "Number of steps in spiral trajectory"}
+        default=40, metadata={"help": "Number of steps in spiral trajectory"}
     )
     cone_angle: float = field(default=30.0, metadata={"help": "Cone angle in degrees"})
     visible_sweep: float = field(

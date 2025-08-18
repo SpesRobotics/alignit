@@ -78,6 +78,14 @@ def main(cfg: TrainConfig):
             batch_depth_tensors = None
             if cfg.model.use_depth_input:
                 batch_depth_tensors = []
+
+                # print min and max in depth_images_pil
+                print("Depth images min and max values:")
+                print([
+                    (np.array(d_img).min(), np.array(d_img).max())
+                    for d_img in depth_images_pil
+                ])
+
                 for depth_sequence in depth_images_pil:
                     if depth_sequence is None:
                         raise ValueError(
