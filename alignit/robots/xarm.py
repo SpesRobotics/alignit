@@ -120,6 +120,114 @@ class Xarm(Robot):
 
     def pose(self):
         return self.robot._jacobi.get_ee_pose()
+    
+class Xarm7(Robot):
+    def __init__(self):
+        # Configure the RealSense camera (same as before)
+        config = RealSenseCameraConfig(
+            serial_number_or_name="233522070823",
+            fps=60,
+            width=640,
+            height=480,
+            use_depth=True,
+        )
+        self.camera = RealSenseCamera(config)
+
+        # Use the 7DOF xArm configuration
+        robot_config = XarmConfig(model="xarm7")  # <-- difference here
+        self.robot = LeXarm(robot_config)
+        self._connect()
+
+    def _connect(self):
+        self.camera.connect()
+        self.robot.connect()
+
+    def send_action(self, action):
+        self.robot.send_action(action)
+
+    def get_intrinsics(self):
+        return self.camera.get_intrinsics()
+
+    def get_observation(self):
+        rgb_image, depth_image, acquisition_time = self.camera.async_read()
+        depth_array_clipped = np.clip(np.array(depth_image), a_min=0, a_max=1000)
+        depth_image = np.array(depth_array_clipped) / 1000.0
+
+        return {
+            "rgb": rgb_image,
+            "depth": depth_image,
+        }
+
+    def disconnect(self):
+        self.camera.disconnect()
+
+    def servo_to_pose(self, pose, lin_tol=1e-3, ang_tol=1e-2):
+        while not are_tfs_close(self.pose(), pose, lin_tol, ang_tol):
+            action = {
+                "pose": pose,
+                "gripper.pos": 1.0,
+            }
+            self.send_action(action)
+            time.sleep(1.0 / 60.0)
+
+    def close_gripper(self):
+        action = {
+            "pose": self.pose(),
+            "gripper.pos": 0.0,
+        }
+        self.send_action(action)
+
+    def open_gripper(self):
+        action = {
+            "pose": self.pose(),
+            "gripper.pos": 1.0,
+        }
+        self.send_action(action)
+
+    def gripper_off(self):
+        action = {
+            "pose": self.pose(),
+            "gripper.pos": 0.5,
+        }
+        self.send_action(action)
+
+    def reset(self, cfg: RecordConfig):
+        self.robot.disconnect()
+        input("Press Enter after positioning the arm...")
+        self.robot.connect()
+        current_pose = self.pose()
+        gripper_z_offset = np.array(
+            [[1, 0, 0, 0],
+             [0, 1, 0, 0],
+             [0, 0, 1, cfg.manual_height],
+             [0, 0, 0, 1]]
+        )
+        offset_pose = current_pose @ gripper_z_offset
+        self.servo_to_pose(pose=offset_pose)
+
+        world_z_offset_mat = np.array(
+            [[1, 0, 0, 0],
+             [0, 1, 0, 0],
+             [0, 0, 1, cfg.world_z_offset],
+             [0, 0, 0, 1]]
+        )
+        final_pose = offset_pose @ world_z_offset_mat
+        self.servo_to_pose(pose=final_pose)
+        current_pose = self.pose()
+        pose_start = current_pose @ t3d.affines.compose(
+            [0, 0, -0.01], t3d.euler.euler2mat(0, 0, 0), [1, 1, 1]
+        )
+        pose_alignment_target = current_pose
+
+        _, (position, _, _) = self.robot._arm.get_joint_states()
+        for i in range(7):  # <-- 7 joints instead of 6
+            joint_name = f"joint{i+1}"
+            self.robot._jacobi.set_joint_position(joint_name, position[i])
+
+        return pose_start, pose_alignment_target
+
+    def pose(self):
+        return self.robot._jacobi.get_ee_pose()
 
 
 if __name__ == "__main__":
