@@ -54,6 +54,7 @@ def main(cfg: TrainConfig):
     net.train()
 
     for epoch in range(cfg.epochs):
+        total_loss = 0
         for batch in tqdm(train_loader, desc=f"Epoch {epoch+1}"):
             images = batch["images"]
             depth_images_pil = batch["depth_images"]
@@ -114,8 +115,9 @@ def main(cfg: TrainConfig):
             loss.backward()
             optimizer.step()
 
-            tqdm.write(f"Loss: {loss.item():.4f}")
+            total_loss += loss.item()
 
+        tqdm.write(f"Loss: {total_loss / len(train_loader):.4f}")
         torch.save(net.state_dict(), cfg.model.path)
         tqdm.write(f"Model saved as {cfg.model.path}")
 
