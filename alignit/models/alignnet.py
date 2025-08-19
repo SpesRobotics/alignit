@@ -127,6 +127,5 @@ class AlignNet(nn.Module):
             features.append(vec_feats)
 
         fused = torch.cat(features, dim=1)
-        print("Fused shape:", fused.shape)
 
         return self.head(fused)  # (B, output_dim)
