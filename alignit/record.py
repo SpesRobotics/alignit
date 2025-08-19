@@ -19,6 +19,7 @@ from alignit.robots.xarm import Xarm
 from alignit.utils.zhou import se3_sixd
 import draccus
 from alignit.config import RecordConfig
+import time
 
 
 def generate_spiral_trajectory(start_pose, cfg):
@@ -80,7 +81,7 @@ def generate_spiral_trajectory(start_pose, cfg):
 @draccus.wrap()
 def main(cfg: RecordConfig):
     """Record alignment dataset using configuration parameters."""
-    robot = XarmSim()
+    robot = Xarm()
     features = Features(
         {
             "images": Sequence(Image()),
@@ -90,7 +91,7 @@ def main(cfg: RecordConfig):
     )
 
     for episode in range(cfg.episodes):
-        pose_start, pose_alignment_target = robot.reset()
+        pose_start, pose_alignment_target = robot.reset(cfg=cfg)
         trajectory = generate_spiral_trajectory(pose_start, cfg.trajectory)
         pose = robot.pose()
         frames = []

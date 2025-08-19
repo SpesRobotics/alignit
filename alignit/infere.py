@@ -33,7 +33,7 @@ def main(cfg: InferConfig):
     net.to(device)
     net.eval()
 
-    robot = XarmSim()
+    robot = Xarm()
 
     start_pose = t3d.affines.compose(
         [0.23, 0, 0.25], t3d.euler.euler2mat(np.pi, 0, 0), [1, 1, 1]
@@ -86,6 +86,7 @@ def main(cfg: InferConfig):
             relative_action[:3, :3] = np.linalg.matrix_power(
                 relative_action[:3, :3], cfg.rotation_matrix_multiplier
             )
+            
             if are_tfs_close(
                 relative_action, lin_tol=cfg.lin_tolerance, ang_tol=ang_tol_rad
             ):
@@ -94,6 +95,9 @@ def main(cfg: InferConfig):
                 iterations_within_tolerance = 0
 
             print(relative_action)
+            if np.linalg.norm(relative_action[2, 3]) < 0.02:
+                relative_action[:3, 3] = relative_action[:3, 3] / 5.0
+
             target_pose = robot.pose() @ relative_action
             iteration += 1
             action = {
@@ -104,6 +108,7 @@ def main(cfg: InferConfig):
             if iterations_within_tolerance >= cfg.max_iterations:
                 print(f"Reached maximum iterations ({cfg.max_iterations}) - stopping.")
                 print("Moving robot to final pose.")
+                time.sleep(10.0)
                 current_pose = robot.pose()
                 gripper_z_offset = np.array(
                     [

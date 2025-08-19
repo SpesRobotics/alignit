@@ -11,7 +11,7 @@ class DatasetConfig:
     """Configuration for dataset paths and loading."""
 
     path: str = field(
-        default="./data/default", metadata={"help": "Path to the dataset directory"}
+        default="./datasets/noviApriltag4", metadata={"help": "Path to the dataset directory"}
     )
 
 
@@ -147,13 +147,13 @@ class InferConfig:
         metadata={"help": "Starting pose RPY angles"},
     )
     lin_tolerance: float = field(
-        default=5e-3, metadata={"help": "Linear tolerance for convergence (meters)"}
+        default=4e-3, metadata={"help": "Linear tolerance for convergence (meters)"}
     )
     ang_tolerance: float = field(
-        default=5, metadata={"help": "Angular tolerance for convergence (degrees)"}
+        default=4, metadata={"help": "Angular tolerance for convergence (degrees)"}
     )
     max_iterations: Optional[int] = field(
-        default=20,
+        default=5,
         metadata={"help": "Maximum iterations before stopping (None = infinite)"},
     )
     debug_output: bool = field(
