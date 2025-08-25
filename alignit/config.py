@@ -11,7 +11,7 @@ class DatasetConfig:
     """Configuration for dataset paths and loading."""
 
     path: str = field(
-        default="./datasets/noviApriltag4",
+        default="./data/sim",
         metadata={"help": "Path to the dataset directory"},
     )
 

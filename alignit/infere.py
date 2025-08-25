@@ -11,6 +11,14 @@ from alignit.utils.zhou import sixd_se3
 from alignit.utils.tfs import print_pose, are_tfs_close
 from alignit.robots.xarmsim import XarmSim
 from alignit.robots.xarm import Xarm
+import matplotlib.pyplot as plt
+import csv
+
+def rot_angle_deg(R: np.ndarray) -> float:
+    # Robust acos for rotation angle in [0, pi]
+    c = (np.trace(R) - 1.0) * 0.5
+    c = np.clip(c, -1.0, 1.0)
+    return np.degrees(np.arccos(c))
 
 
 @draccus.wrap()
@@ -33,7 +41,7 @@ def main(cfg: InferConfig):
     net.to(device)
     net.eval()
 
-    robot = Xarm()
+    robot = XarmSim()
 
     start_pose = t3d.affines.compose(
         [0.23, 0, 0.25], t3d.euler.euler2mat(np.pi, 0, 0), [1, 1, 1]
@@ -42,6 +50,27 @@ def main(cfg: InferConfig):
     iteration = 0
     iterations_within_tolerance = 0
     ang_tol_rad = np.deg2rad(cfg.ang_tolerance)
+    # ---- Convergence logging + live plot setup ----
+    t0 = time.perf_counter()
+    times_s = []
+    trans_m = []
+    rot_deg = []
+
+    enable_live_plot = True
+    save_plot_path = "convergence.png"
+    save_csv_path = "convergence_log.csv"
+    if enable_live_plot:
+        plt.ion()
+        fig, (ax1, ax2) = plt.subplots(2, 1, sharex=True, figsize=(7, 6))
+        ln_trans, = ax1.plot([], [], linewidth=2)
+        ax1.set_ylabel("Translation error [m]")
+        ax1.grid(True, linestyle=":")
+
+        ln_rot, = ax2.plot([], [], linewidth=2)
+        ax2.set_ylabel("Rotation error [deg]")
+        ax2.set_xlabel("Time [s]")
+        ax2.grid(True, linestyle=":")
+        fig.tight_layout()
     try:
         while True:
             observation = robot.get_observation()
@@ -87,6 +116,24 @@ def main(cfg: InferConfig):
                 relative_action[:3, :3], cfg.rotation_matrix_multiplier
             )
 
+            elapsed = time.perf_counter() - t0
+            t_err = float(np.linalg.norm(relative_action[:3, 3]))
+            r_err = float(rot_angle_deg(relative_action[:3, :3]))
+
+            times_s.append(elapsed)
+            trans_m.append(t_err)
+            rot_deg.append(r_err)
+
+            # ---- Live plot update ----
+            if enable_live_plot:
+                ln_trans.set_data(times_s, trans_m)
+                ln_rot.set_data(times_s, rot_deg)
+                ax1.relim(); ax1.autoscale_view()
+                ax2.relim(); ax2.autoscale_view()
+                # Optionally annotate current values in the title:
+                ax1.set_title(f"Convergence (t={elapsed:.2f}s, ‖t‖={t_err:.3f} m, θ={r_err:.1f}°)")
+                plt.pause(0.001)
+
             if are_tfs_close(
                 relative_action, lin_tol=cfg.lin_tolerance, ang_tol=ang_tol_rad
             ):
@@ -108,27 +155,46 @@ def main(cfg: InferConfig):
             if iterations_within_tolerance >= cfg.max_iterations:
                 print(f"Reached maximum iterations ({cfg.max_iterations}) - stopping.")
                 print("Moving robot to final pose.")
-                time.sleep(10.0)
-                current_pose = robot.pose()
-                gripper_z_offset = np.array(
-                    [
-                        [1, 0, 0, 0],
-                        [0, 1, 0, 0],
-                        [0, 0, 1, cfg.manual_height],
-                        [0, 0, 0, 1],
-                    ]
-                )
-                offset_pose = current_pose @ gripper_z_offset
-                robot.servo_to_pose(pose=offset_pose)
-                robot.close_gripper()
-                robot.gripper_off()
-
+                # time.sleep(10.0)
+                # current_pose = robot.pose()
+                # gripper_z_offset = np.array(
+                #     [
+                #         [1, 0, 0, 0],
+                #         [0, 1, 0, 0],
+                #         [0, 0, 1, cfg.manual_height],
+                #         [0, 0, 0, 1],
+                #     ]
+                # )
+                # offset_pose = current_pose @ gripper_z_offset
+                # robot.servo_to_pose(pose=offset_pose)
+                # robot.close_gripper()
+                # robot.gripper_off()
+                # stop_time = time.perf_counter() - t0
+                # print(f"Total time to stop: {stop_time:.3f} s")
+                # if enable_live_plot:
+                #     # Draw a vertical line at stop
+                #     for ax in (ax1, ax2):
+                #         ax.axvline(stop_time, linestyle="--")
+                #     fig.canvas.draw()
+                #     fig.canvas.flush_events()
                 break
-
-        time.sleep(10.0)
     except KeyboardInterrupt:
         print("\nExiting...")
 
+
+    if enable_live_plot:
+        plt.ioff()
+    if save_plot_path:
+        fig.savefig(save_plot_path, dpi=150, bbox_inches="tight")
+        print(f"Saved plot to {save_plot_path}")
+
+    if save_csv_path and len(times_s) > 0:
+        with open(save_csv_path, "w", newline="") as f:
+            w = csv.writer(f)
+            w.writerow(["time_s", "trans_error_m", "rot_error_deg"])
+            w.writerows(zip(times_s, trans_m, rot_deg))
+        print(f"Saved log to {save_csv_path}")   
+    
     robot.disconnect()
 
 

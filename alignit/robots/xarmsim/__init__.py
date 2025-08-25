@@ -5,13 +5,12 @@ import mujoco.viewer
 import numpy as np
 import transforms3d as t3d
 from teleop.utils.jacobi_robot import JacobiRobot
-from collections import deque
+
 from alignit.robots.robot import Robot
 
 
 class XarmSim(Robot):
     def __init__(self):
-
         self.gripper_open_pos = 0.008
         self.gripper_close_pos = -0.008
         self.current_gripper_pos = 0.0
@@ -19,13 +18,7 @@ class XarmSim(Robot):
         mjcf_path = self.this_dir / "ufactory_lite6" / "scene.xml"
         urdf_path_jacobi = self.this_dir / "lite6.urdf"
         end_effector_frame_name_jacobi = "link6"
-        self.trail_points = deque(maxlen=100000)   
-        self._trail_every_n = 10             
-        self._trail_counter = 0
-        
 
-        
-        
         try:
             self.model = mj.MjModel.from_xml_path(str(mjcf_path))
             self.data = mj.MjData(self.model)
@@ -41,11 +34,9 @@ class XarmSim(Robot):
         except Exception as e:
             print(f"Failed to load MuJoCo model from {mjcf_path}: {e}")
             raise RuntimeError(f"Failed to load MuJoCo model from {mjcf_path}: {e}")
-        def _keys(self,keycode):
-                if chr(keycode).lower() == 'c':
-                    self.clear_trail()
-        self.viewer = mujoco.viewer.launch_passive(self.model, self.data, key_callback=_keys)
+
         self.renderer = mujoco.Renderer(self.model, 240, 320)
+        self.viewer = mujoco.viewer.launch_passive(self.model, self.data)
 
         self.robot_jacobi = JacobiRobot(
             str(urdf_path_jacobi), ee_link=end_effector_frame_name_jacobi
@@ -168,8 +159,7 @@ class XarmSim(Robot):
         self.data.ctrl[self.mujoco_actuator_ids] = target_joint_qpos_for_mujoco
 
         mj.mj_step(self.model, self.data)
-        self._record_trail_point()
-        self._draw_trail()
+
         self.viewer.sync()
         return True
 
@@ -218,59 +208,6 @@ class XarmSim(Robot):
         if self.viewer:
             self.viewer.close()
             self.viewer = None
-
-    def _record_trail_point(self):
-        self._trail_counter += 1
-        if self._trail_counter % self._trail_every_n != 0:
-            return
-        eef_id = self.model.body("link6").id
-        self.trail_points.append(self.data.xpos[eef_id].copy())
-
-    def _draw_trail(self):
-        if self.viewer is None or not self.trail_points:
-            return
-        with self.viewer.lock():  
-            scn = self.viewer.user_scn
-            i = 0
-            maxgeom = len(scn.geoms)
-
-            for p in self.trail_points:
-                if i >= maxgeom: break
-                mj.mjv_initGeom(
-                    scn.geoms[i],
-                    type=mj.mjtGeom.mjGEOM_SPHERE,
-                    size=np.array([0.004, 0, 0], dtype=np.float32),  
-                    pos=np.asarray(p, dtype=np.float32),
-                    mat=np.eye(3, dtype=np.float32).ravel(),
-                    rgba=np.array([1, 0, 0, 1], dtype=np.float32),  
-                )
-                i += 1
-
-            pts = list(self.trail_points)
-            for a, b in zip(pts[:-1], pts[1:]):
-                if i >= maxgeom: break
-                mj.mjv_initGeom(
-                    scn.geoms[i],
-                    type=mj.mjtGeom.mjGEOM_LINE,
-                    size=np.zeros(3, dtype=np.float32),
-                    pos=np.zeros(3, dtype=np.float32),
-                    mat=np.eye(3, dtype=np.float32).ravel(),
-                    rgba=np.array([1, 1, 0, 1], dtype=np.float32),  
-                )
-                mj.mjv_connector(scn.geoms[i], mj.mjtGeom.mjGEOM_LINE, 1.5,
-                                 np.asarray(a, dtype=np.float32),
-                                 np.asarray(b, dtype=np.float32))
-                i += 1
-
-            scn.ngeom = i 
-        self.viewer.sync()
-
-    def clear_trail(self):
-        self.trail_points.clear()
-        if self.viewer:
-            with self.viewer.lock():
-                self.viewer.user_scn.ngeom = 0
-            self.viewer.sync()
 
 
 if __name__ == "__main__":
