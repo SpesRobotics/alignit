@@ -86,7 +86,7 @@ def main(cfg: InferConfig):
             relative_action[:3, :3] = np.linalg.matrix_power(
                 relative_action[:3, :3], cfg.rotation_matrix_multiplier
             )
-            
+
             if are_tfs_close(
                 relative_action, lin_tol=cfg.lin_tolerance, ang_tol=ang_tol_rad
             ):
@@ -96,7 +96,7 @@ def main(cfg: InferConfig):
 
             print(relative_action)
             if np.linalg.norm(relative_action[2, 3]) < 0.02:
-                relative_action[:3, 3] = relative_action[:3, 3] / 5.0
+               relative_action[:3, 3] = relative_action[:3, 3] / 5.0
 
             target_pose = robot.pose() @ relative_action
             iteration += 1

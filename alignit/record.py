@@ -81,7 +81,7 @@ def generate_spiral_trajectory(start_pose, cfg):
 @draccus.wrap()
 def main(cfg: RecordConfig):
     """Record alignment dataset using configuration parameters."""
-    robot = Xarm()
+    robot = XarmSim()
     features = Features(
         {
             "images": Sequence(Image()),
@@ -91,7 +91,9 @@ def main(cfg: RecordConfig):
     )
 
     for episode in range(cfg.episodes):
-        pose_start, pose_alignment_target = robot.reset(cfg=cfg)
+        null_pose = robot.pose()
+        null_pose[2, 3] += 0.1
+        pose_start, pose_alignment_target = robot.reset()
         trajectory = generate_spiral_trajectory(pose_start, cfg.trajectory)
         pose = robot.pose()
         frames = []
@@ -115,7 +117,7 @@ def main(cfg: RecordConfig):
         print(f"Episode {episode+1} completed with {len(frames)} frames.")
 
         episode_dataset = Dataset.from_list(frames, features=features)
-
+        robot.servo_to_pose(null_pose)
         # 2. Load existing dataset if available
         if os.path.exists(cfg.dataset.path):
             existing_dataset = load_from_disk(cfg.dataset.path)
