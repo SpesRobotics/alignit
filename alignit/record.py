@@ -15,10 +15,16 @@ from datasets import (
 )
 
 from alignit.robots.xarmsim import XarmSim
-from alignit.robots.xarm import Xarm
+
 from alignit.utils.zhou import se3_sixd
 import draccus
 from alignit.config import RecordConfig
+
+Xarm = None
+try:
+    from alignit.robots.xarm import Xarm
+except ImportError:
+    pass
 
 
 def generate_spiral_trajectory(start_pose, cfg):

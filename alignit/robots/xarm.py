@@ -2,7 +2,8 @@ import time
 
 import numpy as np
 import transforms3d as t3d
-from lerobot.cameras.realsense import RealSenseCamera, RealSenseCameraConfig
+from lerobot.cameras.realsense.camera_realsense import RealSenseCamera
+from lerobot.cameras.realsense.configuration_realsense import RealSenseCameraConfig
 from lerobot_xarm.xarm import Xarm as LeXarm
 from lerobot_xarm.config import XarmConfig
 
