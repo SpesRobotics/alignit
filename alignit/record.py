@@ -84,7 +84,19 @@ def generate_spiral_trajectory(start_pose, cfg):
 @draccus.wrap()
 def main(cfg: RecordConfig):
     """Record alignment dataset using configuration parameters."""
-    robot = XarmSim()
+    if cfg.robot_type == "sim":
+        print("Using MuJoCo simulation (xArm Lite6 simulator)")
+        robot = XarmSim()
+    elif cfg.robot_type == "real":
+        print("Connecting to real xArm robot...")
+        if Xarm is None:
+            print("Robot not available.")
+            return
+        robot = Xarm()
+    else:
+        raise ValueError(
+            f"Unknown robot_type '{cfg.robot_type}'. Use 'sim' or 'real'."
+        )
     
     save_depth = getattr(cfg, "save_depth", True) 
 

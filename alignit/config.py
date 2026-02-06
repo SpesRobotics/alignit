@@ -48,7 +48,7 @@ class ModelConfig:
         metadata={"help": "Path to save/load trained model"},
     )
     use_depth_input: bool = field(
-        default=True, metadata={"help": "Whether to use depth input for the model"}
+        default=False, metadata={"help": "Whether to use depth input for the model"}
     )
     depth_hidden_dim: int = field(
         default=128, metadata={"help": "Output dimension of depth CNN"}
@@ -92,6 +92,10 @@ class RecordConfig:
 
     dataset: DatasetConfig = field(default_factory=DatasetConfig)
     trajectory: TrajectoryConfig = field(default_factory=TrajectoryConfig)
+    robot_type: str = field(
+        default="sim",
+        metadata={"help": "Robot type: 'sim' for simulation or 'real' for real xArm robot"},
+    )
     episodes: int = field(default=10, metadata={"help": "Number of episodes to record"})
     lin_tol_alignment: float = field(
         default=0.015, metadata={"help": "Linear tolerance for alignment servo"}
