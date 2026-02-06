@@ -37,7 +37,7 @@ def main(cfg: InferConfig):
     net.to(device)
     net.eval()
 
-    robot = XarmSim()
+    robot = Xarm()
 
     start_pose = t3d.affines.compose(
         [0.23, 0, 0.25], t3d.euler.euler2mat(np.pi, 0, 0), [1, 1, 1]
@@ -50,34 +50,28 @@ def main(cfg: InferConfig):
     try:
         while True:
             observation = robot.get_observation()
-            rgb_image = observation["rgb"].astype(np.float32) / 255.0
-            
-            rgb_image_tensor = (
-                torch.from_numpy(np.array(rgb_image))
-                .permute(2, 0, 1)  # (H, W, C) -> (C, H, W)
-                .unsqueeze(0)
+            # 1. Capture the raw numpy array from LeRobot's async_read
+            rgb_np = observation["rgb"].astype(np.float32) / 255.0
+
+            # 2. Safety check: Ensure it has 3 dimensions (H, W, C)
+            # If the camera returned (480, 640), turn it into (480, 640, 1)
+            if rgb_np.ndim == 2:
+                rgb_np = np.expand_dims(rgb_np, axis=-1)
+
+            # 3. Backbone requirement: EfficientNet needs 3 channels
+            # If it's grayscale (1 channel), broadcast it to 3 channels
+            if rgb_np.shape[-1] == 1:
+                rgb_np = np.repeat(rgb_np, 3, axis=-1)
+
+            # 4. Transform to (Batch, Sequence, Channel, Height, Width)
+            # This converts (480, 640, 3) -> (3, 480, 640) -> (1, 1, 3, 480, 640)
+            rgb_images_batch = (
+                torch.from_numpy(rgb_np)
+                .permute(2, 0, 1)    # Move channels to front
+                .unsqueeze(0)        # Add Batch dimension
+                .unsqueeze(0)        # Add Sequence dimension
                 .to(device)
             )
-            rgb_images_batch = rgb_image_tensor.unsqueeze(1)
-
-            depth_images_batch = None
-            if cfg.model.use_depth_input:
-                depth_image = observation["depth"].astype(np.float32)
-                
-                print(
-                    "Min/Max depth,mean (raw):",
-                    observation["depth"].min(),
-                    observation["depth"].max(),
-                    observation["depth"].mean(),
-                )
-                
-                depth_image_tensor = (
-                    torch.from_numpy(np.array(depth_image))
-                    .unsqueeze(0)  # Add channel dimension: (1, H, W)
-                    .unsqueeze(0)  # Add batch dimension: (1, 1, H, W)
-                    .to(device)
-                )
-                depth_images_batch = depth_image_tensor.unsqueeze(1)
 
             with torch.no_grad():
                 if cfg.model.use_depth_input:
