@@ -4,8 +4,8 @@ import numpy as np
 import transforms3d as t3d
 from lerobot.cameras.realsense.camera_realsense import RealSenseCamera
 from lerobot.cameras.realsense.configuration_realsense import RealSenseCameraConfig
-from lerobot_xarm.xarm import Xarm as LeXarm
-from lerobot_xarm.config import XarmConfig
+from lerobot_robot_xarm.xarm import Xarm as LeXarm
+from lerobot_robot_xarm.config_xarm import XarmConfig
 
 from alignit.robots.robot import Robot
 from alignit.utils.tfs import are_tfs_close
