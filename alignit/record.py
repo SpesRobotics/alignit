@@ -15,7 +15,6 @@ from datasets import (
 )
 
 from alignit.robots.xarmsim import XarmSim
-
 from alignit.utils.zhou import se3_sixd
 import draccus
 from alignit.config import RecordConfig
@@ -82,23 +81,26 @@ def generate_spiral_trajectory(start_pose, cfg):
 
     return trajectory
 
-
 @draccus.wrap()
 def main(cfg: RecordConfig):
     """Record alignment dataset using configuration parameters."""
     robot = XarmSim()
-    features = Features(
-        {
-            "images": Sequence(Image()),
-            "action": Sequence(Value("float32")),
-            "depth": Sequence(Image()),
-        }
-    )
+    
+    save_depth = getattr(cfg, "save_depth", True) 
+
+    feature_dict = {
+        "images": Sequence(Image()),
+        "action": Sequence(Value("float32")),
+    }
+    
+    if save_depth:
+        feature_dict["depth"] = Sequence(Image())
+
+    features = Features(feature_dict)
 
     for episode in range(cfg.episodes):
         pose_start, pose_alignment_target = robot.reset()
         trajectory = generate_spiral_trajectory(pose_start, cfg.trajectory)
-        pose = robot.pose()
         frames = []
         for pose in trajectory:
             robot.servo_to_pose(
@@ -110,33 +112,36 @@ def main(cfg: RecordConfig):
             action_sixd = se3_sixd(action_pose)
 
             observation = robot.get_observation()
-            print(observation.keys())
             frame = {
                 "images": [observation["rgb"].copy()],
                 "action": action_sixd,
-                "depth": [observation["depth"].copy()],
             }
+
+            if save_depth:
+                frame["depth"] = [observation["depth"].copy()]
+
             frames.append(frame)
         print(f"Episode {episode+1} completed with {len(frames)} frames.")
 
         episode_dataset = Dataset.from_list(frames, features=features)
 
-        # 2. Load existing dataset if available
         if os.path.exists(cfg.dataset.path):
             existing_dataset = load_from_disk(cfg.dataset.path)
+            
+            if "depth" in existing_dataset.features and not save_depth:
+                print("Warning: Existing dataset has depth, but current run does not.")
+            
             existing_dataset = existing_dataset.cast(features)
             combined_dataset = concatenate_datasets([existing_dataset, episode_dataset])
         else:
             combined_dataset = episode_dataset
 
-        # 3. Save to TEMPORARY location first (avoid self-overwrite)
         temp_path = f"{cfg.dataset.path}_temp"
         combined_dataset.save_to_disk(temp_path)
 
-        # 4. Atomic replacement (only after successful save)
         if os.path.exists(cfg.dataset.path):
-            shutil.rmtree(cfg.dataset.path)  # Remove old version
-        shutil.move(temp_path, cfg.dataset.path)  # Move new version into place
+            shutil.rmtree(cfg.dataset.path)
+        shutil.move(temp_path, cfg.dataset.path)
 
     robot.disconnect()
 

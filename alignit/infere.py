@@ -1,5 +1,4 @@
 import time
-
 import torch
 import transforms3d as t3d
 import numpy as np
@@ -10,7 +9,12 @@ from alignit.models.alignnet import AlignNet
 from alignit.utils.zhou import sixd_se3
 from alignit.utils.tfs import print_pose, are_tfs_close
 from alignit.robots.xarmsim import XarmSim
-from alignit.robots.xarm import Xarm
+
+Xarm = None
+try:
+    from alignit.robots.xarm import Xarm
+except ImportError:
+    pass
 
 
 @draccus.wrap()
@@ -42,41 +46,45 @@ def main(cfg: InferConfig):
     iteration = 0
     iterations_within_tolerance = 0
     ang_tol_rad = np.deg2rad(cfg.ang_tolerance)
+    
     try:
         while True:
             observation = robot.get_observation()
             rgb_image = observation["rgb"].astype(np.float32) / 255.0
-            depth_image = observation["depth"].astype(np.float32)
-            print(
-                "Min/Max depth,mean (raw):",
-                observation["depth"].min(),
-                observation["depth"].max(),
-                observation["depth"].mean(),
-            )
-            print(
-                "Min/Max depth,mean (scaled):",
-                depth_image.min(),
-                depth_image.max(),
-                depth_image.mean(),
-            )
+            
             rgb_image_tensor = (
                 torch.from_numpy(np.array(rgb_image))
                 .permute(2, 0, 1)  # (H, W, C) -> (C, H, W)
                 .unsqueeze(0)
                 .to(device)
             )
-
-            depth_image_tensor = (
-                torch.from_numpy(np.array(depth_image))
-                .unsqueeze(0)  # Add channel dimension: (1, H, W)
-                .unsqueeze(0)  # Add batch dimension: (1, 1, H, W)
-                .to(device)
-            )
             rgb_images_batch = rgb_image_tensor.unsqueeze(1)
-            depth_images_batch = depth_image_tensor.unsqueeze(1)
+
+            depth_images_batch = None
+            if cfg.model.use_depth_input:
+                depth_image = observation["depth"].astype(np.float32)
+                
+                print(
+                    "Min/Max depth,mean (raw):",
+                    observation["depth"].min(),
+                    observation["depth"].max(),
+                    observation["depth"].mean(),
+                )
+                
+                depth_image_tensor = (
+                    torch.from_numpy(np.array(depth_image))
+                    .unsqueeze(0)  # Add channel dimension: (1, H, W)
+                    .unsqueeze(0)  # Add batch dimension: (1, 1, H, W)
+                    .to(device)
+                )
+                depth_images_batch = depth_image_tensor.unsqueeze(1)
 
             with torch.no_grad():
-                relative_action = net(rgb_images_batch, depth_images=depth_images_batch)
+                if cfg.model.use_depth_input:
+                    relative_action = net(rgb_images_batch, depth_images=depth_images_batch)
+                else:
+                    relative_action = net(rgb_images_batch)
+
             relative_action = relative_action.squeeze(0).cpu().numpy()
             relative_action = sixd_se3(relative_action)
 
