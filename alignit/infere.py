@@ -16,13 +16,13 @@ try:
 except ImportError:
     pass
 
-
 @draccus.wrap()
 def main(cfg: InferConfig):
     """Run inference/alignment using configuration parameters."""
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
+    # Initialize Model
     net = AlignNet(
         backbone_name=cfg.model.backbone,
         backbone_weights=cfg.model.backbone_weights,
@@ -37,97 +37,136 @@ def main(cfg: InferConfig):
     net.to(device)
     net.eval()
 
-    robot = Xarm()
-
-    start_pose = t3d.affines.compose(
-        [0.23, 0, 0.25], t3d.euler.euler2mat(np.pi, 0, 0), [1, 1, 1]
-    )
-    robot.servo_to_pose(start_pose, lin_tol=1e-2)
-    iteration = 0
-    iterations_within_tolerance = 0
-    ang_tol_rad = np.deg2rad(cfg.ang_tolerance)
+    # Initialize Robot
+    robot = XarmSim()
     
-    try:
-        while True:
-            observation = robot.get_observation()
-            # 1. Capture the raw numpy array from LeRobot's async_read
-            rgb_np = observation["rgb"].astype(np.float32) / 255.0
+    num_alignments = getattr(cfg, 'num_alignments', 5)
+    ang_tol_rad = np.deg2rad(cfg.ang_tolerance)
+    alignment_results = []
+    
+    # Safety limit: Total attempts allowed before declaring a trial "Failed"
+    MAX_TOTAL_STEPS = 10000
 
-            # 2. Safety check: Ensure it has 3 dimensions (H, W, C)
-            # If the camera returned (480, 640), turn it into (480, 640, 1)
-            if rgb_np.ndim == 2:
-                rgb_np = np.expand_dims(rgb_np, axis=-1)
+    print(f"\nRunning {num_alignments} alignment trials...\n")
 
-            # 3. Backbone requirement: EfficientNet needs 3 channels
-            # If it's grayscale (1 channel), broadcast it to 3 channels
-            if rgb_np.shape[-1] == 1:
-                rgb_np = np.repeat(rgb_np, 3, axis=-1)
+    for alignment_trial in range(num_alignments):
+        print(f"\n{'='*60}")
+        print(f"Alignment Trial {alignment_trial + 1}/{num_alignments}")
+        print(f"{'='*60}")
+        
+        # 1. Randomize Start Pose
+        start_pose = t3d.affines.compose(
+            [np.random.uniform(0.15, 0.30),
+             np.random.uniform(-0.15, 0.15),
+             np.random.uniform(0.20, 0.35)],
+            t3d.euler.euler2mat(np.pi + np.random.uniform(-0.3, 0.3),
+                               np.random.uniform(-0.3, 0.3),
+                               np.random.uniform(-np.pi, np.pi)),
+            [1, 1, 1]
+        )
+        robot.servo_to_pose(start_pose, lin_tol=1e-2, ang_tol=0.1)
+        
+        iteration = 0
+        iterations_within_tolerance = 0
+        trial_data = []
+        
+        try:
+            while True:
+                # 2. Get Observation and Preprocess
+                observation = robot.get_observation()
+                rgb_np = observation["rgb"].astype(np.float32) / 255.0
 
-            # 4. Transform to (Batch, Sequence, Channel, Height, Width)
-            # This converts (480, 640, 3) -> (3, 480, 640) -> (1, 1, 3, 480, 640)
-            rgb_images_batch = (
-                torch.from_numpy(rgb_np)
-                .permute(2, 0, 1)    # Move channels to front
-                .unsqueeze(0)        # Add Batch dimension
-                .unsqueeze(0)        # Add Sequence dimension
-                .to(device)
-            )
+                if rgb_np.ndim == 2:
+                    rgb_np = np.expand_dims(rgb_np, axis=-1)
+                if rgb_np.shape[-1] == 1:
+                    rgb_np = np.repeat(rgb_np, 3, axis=-1)
 
-            with torch.no_grad():
-                if cfg.model.use_depth_input:
-                    relative_action = net(rgb_images_batch, depth_images=depth_images_batch)
-                else:
+                rgb_images_batch = (
+                    torch.from_numpy(rgb_np)
+                    .permute(2, 0, 1)
+                    .unsqueeze(0).unsqueeze(0)
+                    .to(device)
+                )
+
+                # 3. Model Inference
+                with torch.no_grad():
                     relative_action = net(rgb_images_batch)
 
-            relative_action = relative_action.squeeze(0).cpu().numpy()
-            relative_action = sixd_se3(relative_action)
+                relative_action = relative_action.squeeze(0).cpu().numpy()
+                relative_action = sixd_se3(relative_action)
 
-            if cfg.debug_output:
-                print_pose(relative_action)
+                # Apply rotation matrix power scaling
+                relative_action[:3, :3] = np.linalg.matrix_power(
+                    relative_action[:3, :3], cfg.rotation_matrix_multiplier
+                )
+                
+                # 4. Logic Fix: Check Alignment Tolerance
+                # iterations_within_tolerance tracks consecutive successful alignments
+                if are_tfs_close(
+                    relative_action, lin_tol=cfg.lin_tolerance, ang_tol=ang_tol_rad
+                ):
+                    iterations_within_tolerance += 1
+                    print(f"Step {iteration}: Within Tol ({iterations_within_tolerance}/{cfg.max_iterations})")
+                else:
+                    # Reset if we move outside the tolerance zone
+                    iterations_within_tolerance = 0
+                    print(f"Step {iteration}: Adjusting...")
 
-            relative_action[:3, :3] = np.linalg.matrix_power(
-                relative_action[:3, :3], cfg.rotation_matrix_multiplier
-            )
-            if are_tfs_close(
-                relative_action, lin_tol=cfg.lin_tolerance, ang_tol=ang_tol_rad
-            ):
-                iterations_within_tolerance += 1
-            else:
-                iterations_within_tolerance = 0
-
-            print(relative_action)
-            target_pose = robot.pose() @ relative_action
-            iteration += 1
-            action = {
-                "pose": target_pose,
-                "gripper.pos": 1.0,
-            }
-            robot.send_action(action)
-            if iterations_within_tolerance >= cfg.max_iterations:
-                print(f"Reached maximum iterations ({cfg.max_iterations}) - stopping.")
-                print("Moving robot to final pose.")
+                # 5. Move Robot
                 current_pose = robot.pose()
-                gripper_z_offset = np.array(
-                    [
+                target_pose = current_pose @ relative_action
+                iteration += 1
+                
+                robot.send_action({"pose": target_pose, "gripper.pos": 1.0})
+                
+                # 6. Exit Conditions
+                
+                # SUCCESS: Remained close for the required number of iterations
+                if iterations_within_tolerance >= cfg.max_iterations:
+                    print(f"✓ Converged after {iteration} total steps.")
+                    
+                    # Finalize: Move to height offset and close gripper
+                    gripper_z_offset = np.array([
                         [1, 0, 0, 0],
                         [0, 1, 0, 0],
                         [0, 0, 1, cfg.manual_height],
                         [0, 0, 0, 1],
-                    ]
-                )
-                offset_pose = current_pose @ gripper_z_offset
-                robot.servo_to_pose(pose=offset_pose)
-                robot.close_gripper()
-                robot.gripper_off()
+                    ])
+                    robot.servo_to_pose(pose=robot.pose() @ gripper_z_offset)
+                    robot.close_gripper()
+                    robot.gripper_off()
+                    
+                    alignment_results.append({
+                        "trial": alignment_trial + 1,
+                        "success": True,
+                        "iterations": iteration,
+                    })
+                    break
+                
+                # FAILURE: Safety timeout reached
+                if iteration >= MAX_TOTAL_STEPS:
+                    print(f"✗ Failed: Timeout reached ({MAX_TOTAL_STEPS} steps).")
+                    alignment_results.append({
+                        "trial": alignment_trial + 1,
+                        "success": False,
+                        "iterations": iteration,
+                    })
+                    break
 
-                break
-
-        time.sleep(10.0)
-    except KeyboardInterrupt:
-        print("\nExiting...")
-
+        except KeyboardInterrupt:
+            print("\nTrial interrupted by user.")
+            break
+    
+    # Summary Statistics
+    print(f"\n{'='*60}")
+    print(f"INFERENCE SUMMARY")
+    print(f"{'='*60}")
+    successful = sum(1 for r in alignment_results if r["success"])
+    print(f"Success Rate: {successful}/{len(alignment_results)} ({successful*100//max(1, len(alignment_results))}%)")
+    if alignment_results:
+        print(f"Avg Steps to Converge: {np.mean([r['iterations'] for r in alignment_results]):.1f}")
+    
     robot.disconnect()
-
 
 if __name__ == "__main__":
     main()

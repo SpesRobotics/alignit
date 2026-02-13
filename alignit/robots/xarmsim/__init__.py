@@ -98,6 +98,12 @@ class XarmSim(Robot):
             random_pos, t3d.euler.euler2mat(roll, pitch, yaw), [1, 1, 1]
         )
         self._set_object_pose("pickup_object", pose)
+        # Disable collisions for the pickup object so it doesn't get pushed
+        # by the robot during alignment trials.
+        try:
+            self._disable_object_collisions("pickup_object")
+        except Exception:
+            pass
         pose1 = self._get_object_pose()
         pose_start = pose1 @ t3d.affines.compose(
             [0, 0, -0.1], t3d.euler.euler2mat(0, 0, 0), [1, 1, 1]
@@ -124,6 +130,30 @@ class XarmSim(Robot):
                 qvel_adr = self.model.jnt_dofadr[joint_id]
                 self.data.qvel[qvel_adr : qvel_adr + 6] = 0
         mj.mj_forward(self.model, self.data)
+
+    def _disable_object_collisions(self, object_name: str):
+        """Disable collisions for all geoms belonging to a body.
+
+        This prevents the object from being pushed or reacting to contacts
+        when the robot touches it during benchmarking.
+        """
+        try:
+            body_id = self.model.body(object_name).id
+        except Exception:
+            return
+
+        # body_geomadr is the start index of geoms for this body
+        # body_geomnum is the number of geoms
+        start = int(self.model.body_geomadr[body_id])
+        count = int(self.model.body_geomnum[body_id])
+        for i in range(start, start + count):
+            try:
+                # Set contact type and affinity to 0 to disable contacts
+                self.model.geom_contype[i] = 0
+                self.model.geom_conaffinity[i] = 0
+            except Exception:
+                # Some mujoco bindings may not allow assignment; ignore failures
+                pass
 
     def close_gripper(self):
         self._set_gripper_position(self.gripper_close_pos)
@@ -191,15 +221,9 @@ class XarmSim(Robot):
             name = mujoco.mj_id2name(self.model, mujoco.mjtObj.mjOBJ_CAMERA, i)
             self.renderer.update_scene(self.data, camera=name)
             image = self.renderer.render()
-            self.renderer.enable_depth_rendering()
-            self.renderer.update_scene(self.data, camera=name)
-            image_depth = self.renderer.render()
-            self.renderer.disable_depth_rendering()
 
             # TODO: Handle multiple cameras
             obs["rgb"] = image[:, :, ::-1]
-            obs["depth"] = image_depth
-            obs["depth"] = np.clip(obs["depth"], 0, 1)
 
         return obs
 

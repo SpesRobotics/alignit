@@ -38,17 +38,10 @@ class Xarm(Robot):
         return self.camera.get_intrinsics()
 
     def get_observation(self):
-        frame = self.camera.async_read()
-        
-        rgb_image = frame[0]
-        depth_image = frame[1]
-
-        depth_array_clipped = np.clip(np.array(depth_image), a_min=0, a_max=1000)
-        depth_image = np.array(depth_array_clipped) / 1000.0
+        rgb_image = self.camera.async_read()
 
         return {
             "rgb": rgb_image,
-            "depth": depth_image,
         }
 
     def disconnect(self):

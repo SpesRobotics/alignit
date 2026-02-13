@@ -81,22 +81,17 @@ def generate_spiral_trajectory(start_pose, cfg):
 @draccus.wrap()
 def main(cfg: RecordConfig):
     """Record alignment dataset using configuration parameters."""
-    robot = Xarm()
-    
-    save_depth = getattr(cfg, "save_depth", True) 
+    robot = XarmSim()
 
-    feature_dict = {
-        "images": Sequence(Image()),
-        "action": Sequence(Value("float32")),
-    }
-    
-    if save_depth:
-        feature_dict["depth"] = Sequence(Image())
-
-    features = Features(feature_dict)
+    features = Features(
+        {
+            "images": Sequence(Image()),
+            "action": Sequence(Value("float32")),
+        }
+    )
 
     for episode in range(cfg.episodes):
-        pose_start, pose_alignment_target = robot.reset(cfg)
+        pose_start, pose_alignment_target = robot.reset()
         trajectory = generate_spiral_trajectory(pose_start, cfg.trajectory)
         frames = []
         for pose in trajectory:
@@ -113,10 +108,6 @@ def main(cfg: RecordConfig):
                 "images": [observation["rgb"].copy()],
                 "action": action_sixd,
             }
-
-            if save_depth:
-                frame["depth"] = [observation["depth"].copy()]
-
             frames.append(frame)
         print(f"Episode {episode+1} completed with {len(frames)} frames.")
 
@@ -124,10 +115,6 @@ def main(cfg: RecordConfig):
 
         if os.path.exists(cfg.dataset.path):
             existing_dataset = load_from_disk(cfg.dataset.path)
-            
-            if "depth" in existing_dataset.features and not save_depth:
-                print("Warning: Existing dataset has depth, but current run does not.")
-            
             existing_dataset = existing_dataset.cast(features)
             combined_dataset = concatenate_datasets([existing_dataset, episode_dataset])
         else:
