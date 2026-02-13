@@ -45,7 +45,7 @@ def main(cfg: InferConfig):
     alignment_results = []
     
     # Safety limit: Total attempts allowed before declaring a trial "Failed"
-    MAX_TOTAL_STEPS = 10000
+    MAX_TOTAL_STEPS = 1000
 
     print(f"\nRunning {num_alignments} alignment trials...\n")
 
@@ -95,31 +95,41 @@ def main(cfg: InferConfig):
                 relative_action = relative_action.squeeze(0).cpu().numpy()
                 relative_action = sixd_se3(relative_action)
 
-                # Apply rotation matrix power scaling
-                relative_action[:3, :3] = np.linalg.matrix_power(
-                    relative_action[:3, :3], cfg.rotation_matrix_multiplier
-                )
+                # 4. Calculate error magnitude from ORIGINAL unscaled action
+                # This represents the actual residual error from the network
+                error_magnitude = np.linalg.norm(relative_action[:3, 3])
                 
-                # 4. Logic Fix: Check Alignment Tolerance
-                # iterations_within_tolerance tracks consecutive successful alignments
+                # 5. Check alignment based on ORIGINAL unscaled action
+                # This is the true convergence check - not affected by scaling
                 if are_tfs_close(
                     relative_action, lin_tol=cfg.lin_tolerance, ang_tol=ang_tol_rad
                 ):
                     iterations_within_tolerance += 1
-                    print(f"Step {iteration}: Within Tol ({iterations_within_tolerance}/{cfg.max_iterations})")
+                    print(f"Step {iteration}: Within Tol ({iterations_within_tolerance}/{cfg.debouncing_count}) [error: {error_magnitude:.6f}]")
                 else:
                     # Reset if we move outside the tolerance zone
                     iterations_within_tolerance = 0
-                    print(f"Step {iteration}: Adjusting...")
+                    print(f"Step {iteration}: Adjusting... [error: {error_magnitude:.6f}]")
 
-                # 5. Move Robot
+                # 6. Scale action for robot movement (separate from convergence check)
+                # Error-magnitude based scaling: bigger errors → bigger movements, small errors → small movements
+                min_scale = 1.0
+                error_scale = max(error_magnitude, min_scale)
+                
+                scaled_action = relative_action.copy()
+                scaled_action[:3, 3] *= error_scale  # Scale translation
+                scaled_action[:3, :3] = np.linalg.matrix_power(
+                    scaled_action[:3, :3], int(cfg.rotation_matrix_multiplier)
+                )  # Apply rotation power scaling
+                
+                # 7. Move Robot
                 current_pose = robot.pose()
-                target_pose = current_pose @ relative_action
+                target_pose = current_pose @ scaled_action
                 iteration += 1
                 
                 robot.send_action({"pose": target_pose, "gripper.pos": 1.0})
                 
-                # 6. Exit Conditions
+                # 8. Exit Conditions
                 
                 # SUCCESS: Remained close for the required number of iterations
                 if iterations_within_tolerance >= cfg.max_iterations:
@@ -133,8 +143,8 @@ def main(cfg: InferConfig):
                         [0, 0, 0, 1],
                     ])
                     robot.servo_to_pose(pose=robot.pose() @ gripper_z_offset)
-                    robot.close_gripper()
-                    robot.gripper_off()
+                    #robot.close_gripper()
+                    #robot.gripper_off()
                     
                     alignment_results.append({
                         "trial": alignment_trial + 1,

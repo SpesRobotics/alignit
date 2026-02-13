@@ -168,7 +168,7 @@ class InferConfig:
         metadata={"help": "Number of iterations within tolerance before stopping"},
     )
     rotation_matrix_multiplier: int = field(
-        default=3,
+        default=2.0,
         metadata={
             "help": "Number of times to multiply the rotation matrix of relative action in order to speed up convergence"
         },

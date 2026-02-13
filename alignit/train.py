@@ -1,7 +1,6 @@
 import torch
 from torch.utils.data import DataLoader
 from torch.optim import Adam
-from torch.nn import MSELoss
 from tqdm import tqdm
 from datasets import load_from_disk
 from torchvision import transforms
@@ -10,6 +9,7 @@ import numpy as np
 
 from alignit.config import TrainConfig
 from alignit.models.alignnet import AlignNet
+from alignit.losses import InverseWeightedPositionLoss
 
 
 def collate_fn(batch):
@@ -48,7 +48,7 @@ def main(cfg: TrainConfig):
     )
 
     optimizer = Adam(net.parameters(), lr=cfg.learning_rate)
-    criterion = MSELoss()
+    criterion = InverseWeightedPositionLoss(pos_weight=1.0, rot_weight=1.0, epsilon=0.01)
     net.train()
 
     for epoch in range(cfg.epochs):
