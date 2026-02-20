@@ -36,6 +36,7 @@ setup(
         "xarm-python-sdk",
         "draccus",
         "lerobot",
+        "pyrealsense2",
     ],
     license="Apache 2.0",
     python_requires=">=3.8",

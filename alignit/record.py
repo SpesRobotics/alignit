@@ -85,7 +85,6 @@ def main(cfg: RecordConfig):
         {
             "images": Sequence(Image()),
             "action": Sequence(Value("float32")),
-            "depth": Sequence(Image()),
         }
     )
 
@@ -108,7 +107,6 @@ def main(cfg: RecordConfig):
             frame = {
                 "images": [observation["rgb"].copy()],
                 "action": action_sixd,
-                "depth": [observation["depth"].copy()],
             }
             frames.append(frame)
         print(f"Episode {episode+1} completed with {len(frames)} frames.")
