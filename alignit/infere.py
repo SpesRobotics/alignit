@@ -56,12 +56,8 @@ def main(cfg: InferConfig):
         
         # 1. Randomize Start Pose
         start_pose = t3d.affines.compose(
-            [np.random.uniform(0.15, 0.30),
-             np.random.uniform(-0.15, 0.15),
-             np.random.uniform(0.20, 0.35)],
-            t3d.euler.euler2mat(np.pi + np.random.uniform(-0.3, 0.3),
-                               np.random.uniform(-0.3, 0.3),
-                               np.random.uniform(-np.pi, np.pi)),
+            [0.225, 0.0, 0.275],
+            t3d.euler.euler2mat(np.pi, 0.0, 0.0),
             [1, 1, 1]
         )
         robot.servo_to_pose(start_pose, lin_tol=1e-2, ang_tol=0.1)
@@ -73,6 +69,7 @@ def main(cfg: InferConfig):
         try:
             while True:
                 # 2. Get Observation and Preprocess
+                
                 observation = robot.get_observation()
                 rgb_np = observation["rgb"].astype(np.float32) / 255.0
 
@@ -90,13 +87,31 @@ def main(cfg: InferConfig):
 
                 # 3. Model Inference
                 with torch.no_grad():
-                    relative_action = net(rgb_images_batch)
+                    # Capture the raw tensor from the network
+                    raw_model_output = net(rgb_images_batch)
 
-                relative_action = relative_action.squeeze(0).cpu().numpy()
-                relative_action = sixd_se3(relative_action)
+                # Convert to numpy and transform to 4x4 SE3 matrix
+                # Note: 'raw_model_output' is what we just got from the net
+                relative_action_np = raw_model_output.squeeze(0).cpu().numpy()
+                relative_action = sixd_se3(relative_action_np)
 
-                # 4. Calculate error magnitude from ORIGINAL unscaled action
-                # This represents the actual residual error from the network
+                # --- DEBUG PRINTING ---
+                # 1. Handle the rotation (with NumPy 2.0 safety)
+                rot_mat = np.array(relative_action[:3, :3], dtype=np.float64)
+                try:
+                    euler_rad = t3d.euler.mat2euler(rot_mat)
+                    euler_deg = np.degrees(euler_rad)
+                except Exception:
+                    euler_deg = [0.0, 0.0, 0.0]
+
+                # 2. Handle the translation
+                trans = relative_action[:3, 3]
+
+                print(f"\n--- Model Prediction (Relative to EE) ---")
+                print(f"Translation (m):  X: {trans[0]:.4f}, Y: {trans[1]:.4f}, Z: {trans[2]:.4f}")
+                print(f"Rotation (deg):   R: {euler_deg[0]:.2f}, P: {euler_deg[1]:.2f}, Y: {euler_deg[2]:.2f}")
+                print(f"-----------------------------------------\n")
+
                 error_magnitude = np.linalg.norm(relative_action[:3, 3])
                 
                 # 5. Check alignment based on ORIGINAL unscaled action
@@ -113,7 +128,7 @@ def main(cfg: InferConfig):
 
                 # 6. Scale action for robot movement (separate from convergence check)
                 # Error-magnitude based scaling: bigger errors → bigger movements, small errors → small movements
-                min_scale = 1.0
+                min_scale = 0.0
                 error_scale = max(error_magnitude, min_scale)
                 
                 scaled_action = relative_action.copy()
@@ -127,6 +142,7 @@ def main(cfg: InferConfig):
                 target_pose = current_pose @ scaled_action
                 iteration += 1
                 
+                input("Hold ENTER to move robot (release to continue)...")
                 robot.send_action({"pose": target_pose, "gripper.pos": 1.0})
                 
                 # 8. Exit Conditions

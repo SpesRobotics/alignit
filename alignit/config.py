@@ -151,24 +151,24 @@ class InferConfig:
         metadata={"help": "Starting pose RPY angles"},
     )
     lin_tolerance: float = field(
-        default=5e-3, metadata={"help": "Linear tolerance for convergence (meters)"}
+        default=1e-3, metadata={"help": "Linear tolerance for convergence (meters)"}
     )
     ang_tolerance: float = field(
-        default=5, metadata={"help": "Angular tolerance for convergence (degrees)"}
+        default=2, metadata={"help": "Angular tolerance for convergence (degrees)"}
     )
     max_iterations: Optional[int] = field(
-        default=20,
+        default=5,
         metadata={"help": "Maximum iterations before stopping (None = infinite)"},
     )
     debug_output: bool = field(
         default=True, metadata={"help": "Print debug information during inference"}
     )
     debouncing_count: int = field(
-        default=20,
+        default=5,
         metadata={"help": "Number of iterations within tolerance before stopping"},
     )
     rotation_matrix_multiplier: int = field(
-        default=2.0,
+        default=3,
         metadata={
             "help": "Number of times to multiply the rotation matrix of relative action in order to speed up convergence"
         },
