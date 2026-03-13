@@ -107,7 +107,7 @@ class Xarm(Robot):
         self.servo_to_pose(pose=final_pose)
         current_pose = self.pose()
         pose_start = current_pose @ t3d.affines.compose(
-            [0, 0, 0.01], t3d.euler.euler2mat(0, 0, 0), [1, 1, 1]
+            [0, 0, -0.01], t3d.euler.euler2mat(0, 0, 0), [1, 1, 1]
         )
         pose_alignment_target = current_pose
 

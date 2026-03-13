@@ -151,10 +151,10 @@ class InferConfig:
         metadata={"help": "Starting pose RPY angles"},
     )
     lin_tolerance: float = field(
-        default=1e-3, metadata={"help": "Linear tolerance for convergence (meters)"}
+        default=2e-3, metadata={"help": "Linear tolerance for convergence (meters)"}
     )
     ang_tolerance: float = field(
-        default=2, metadata={"help": "Angular tolerance for convergence (degrees)"}
+        default=4, metadata={"help": "Angular tolerance for convergence (degrees)"}
     )
     max_iterations: Optional[int] = field(
         default=5,

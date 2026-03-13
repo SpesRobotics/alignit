@@ -81,7 +81,7 @@ def generate_spiral_trajectory(start_pose, cfg):
 @draccus.wrap()
 def main(cfg: RecordConfig):
     """Record alignment dataset using configuration parameters."""
-    robot = XarmSim()
+    robot = Xarm()
 
     features = Features(
         {
@@ -91,7 +91,7 @@ def main(cfg: RecordConfig):
     )
 
     for episode in range(cfg.episodes):
-        pose_start, pose_alignment_target = robot.reset()
+        pose_start, pose_alignment_target = robot.reset(cfg)
         trajectory = generate_spiral_trajectory(pose_start, cfg.trajectory)
         frames = []
         for pose in trajectory:

@@ -22,7 +22,6 @@ def main(cfg: InferConfig):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
-    # Initialize Model
     net = AlignNet(
         backbone_name=cfg.model.backbone,
         backbone_weights=cfg.model.backbone_weights,
@@ -37,14 +36,12 @@ def main(cfg: InferConfig):
     net.to(device)
     net.eval()
 
-    # Initialize Robot
-    robot = XarmSim()
+    robot = Xarm()
     
     num_alignments = getattr(cfg, 'num_alignments', 5)
     ang_tol_rad = np.deg2rad(cfg.ang_tolerance)
     alignment_results = []
     
-    # Safety limit: Total attempts allowed before declaring a trial "Failed"
     MAX_TOTAL_STEPS = 1000
 
     print(f"\nRunning {num_alignments} alignment trials...\n")
@@ -54,7 +51,6 @@ def main(cfg: InferConfig):
         print(f"Alignment Trial {alignment_trial + 1}/{num_alignments}")
         print(f"{'='*60}")
         
-        # 1. Randomize Start Pose
         start_pose = t3d.affines.compose(
             [0.225, 0.0, 0.275],
             t3d.euler.euler2mat(np.pi, 0.0, 0.0),
@@ -68,7 +64,6 @@ def main(cfg: InferConfig):
         
         try:
             while True:
-                # 2. Get Observation and Preprocess
                 
                 observation = robot.get_observation()
                 rgb_np = observation["rgb"].astype(np.float32) / 255.0
@@ -85,18 +80,12 @@ def main(cfg: InferConfig):
                     .to(device)
                 )
 
-                # 3. Model Inference
                 with torch.no_grad():
-                    # Capture the raw tensor from the network
                     raw_model_output = net(rgb_images_batch)
 
-                # Convert to numpy and transform to 4x4 SE3 matrix
-                # Note: 'raw_model_output' is what we just got from the net
                 relative_action_np = raw_model_output.squeeze(0).cpu().numpy()
                 relative_action = sixd_se3(relative_action_np)
 
-                # --- DEBUG PRINTING ---
-                # 1. Handle the rotation (with NumPy 2.0 safety)
                 rot_mat = np.array(relative_action[:3, :3], dtype=np.float64)
                 try:
                     euler_rad = t3d.euler.mat2euler(rot_mat)
@@ -104,7 +93,6 @@ def main(cfg: InferConfig):
                 except Exception:
                     euler_deg = [0.0, 0.0, 0.0]
 
-                # 2. Handle the translation
                 trans = relative_action[:3, 3]
 
                 print(f"\n--- Model Prediction (Relative to EE) ---")
@@ -114,30 +102,24 @@ def main(cfg: InferConfig):
 
                 error_magnitude = np.linalg.norm(relative_action[:3, 3])
                 
-                # 5. Check alignment based on ORIGINAL unscaled action
-                # This is the true convergence check - not affected by scaling
                 if are_tfs_close(
                     relative_action, lin_tol=cfg.lin_tolerance, ang_tol=ang_tol_rad
                 ):
                     iterations_within_tolerance += 1
                     print(f"Step {iteration}: Within Tol ({iterations_within_tolerance}/{cfg.debouncing_count}) [error: {error_magnitude:.6f}]")
                 else:
-                    # Reset if we move outside the tolerance zone
                     iterations_within_tolerance = 0
                     print(f"Step {iteration}: Adjusting... [error: {error_magnitude:.6f}]")
 
-                # 6. Scale action for robot movement (separate from convergence check)
-                # Error-magnitude based scaling: bigger errors → bigger movements, small errors → small movements
                 min_scale = 0.0
                 error_scale = max(error_magnitude, min_scale)
                 
                 scaled_action = relative_action.copy()
-                scaled_action[:3, 3] *= error_scale  # Scale translation
+                scaled_action[:3, 3] *= error_scale
                 scaled_action[:3, :3] = np.linalg.matrix_power(
                     scaled_action[:3, :3], int(cfg.rotation_matrix_multiplier)
-                )  # Apply rotation power scaling
+                )
                 
-                # 7. Move Robot
                 current_pose = robot.pose()
                 target_pose = current_pose @ scaled_action
                 iteration += 1
@@ -145,13 +127,10 @@ def main(cfg: InferConfig):
                 input("Hold ENTER to move robot (release to continue)...")
                 robot.send_action({"pose": target_pose, "gripper.pos": 1.0})
                 
-                # 8. Exit Conditions
                 
-                # SUCCESS: Remained close for the required number of iterations
                 if iterations_within_tolerance >= cfg.max_iterations:
                     print(f"✓ Converged after {iteration} total steps.")
                     
-                    # Finalize: Move to height offset and close gripper
                     gripper_z_offset = np.array([
                         [1, 0, 0, 0],
                         [0, 1, 0, 0],
@@ -159,8 +138,6 @@ def main(cfg: InferConfig):
                         [0, 0, 0, 1],
                     ])
                     robot.servo_to_pose(pose=robot.pose() @ gripper_z_offset)
-                    #robot.close_gripper()
-                    #robot.gripper_off()
                     
                     alignment_results.append({
                         "trial": alignment_trial + 1,
@@ -169,7 +146,6 @@ def main(cfg: InferConfig):
                     })
                     break
                 
-                # FAILURE: Safety timeout reached
                 if iteration >= MAX_TOTAL_STEPS:
                     print(f"✗ Failed: Timeout reached ({MAX_TOTAL_STEPS} steps).")
                     alignment_results.append({
@@ -183,7 +159,6 @@ def main(cfg: InferConfig):
             print("\nTrial interrupted by user.")
             break
     
-    # Summary Statistics
     print(f"\n{'='*60}")
     print(f"INFERENCE SUMMARY")
     print(f"{'='*60}")
