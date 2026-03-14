@@ -48,7 +48,7 @@ class ModelConfig:
         metadata={"help": "Path to save/load trained model"},
     )
     use_depth_input: bool = field(
-        default=True, metadata={"help": "Whether to use depth input for the model"}
+        default=False, metadata={"help": "Whether to use depth input for the model"}
     )
     depth_hidden_dim: int = field(
         default=128, metadata={"help": "Output dimension of depth CNN"}
@@ -92,6 +92,10 @@ class RecordConfig:
 
     dataset: DatasetConfig = field(default_factory=DatasetConfig)
     trajectory: TrajectoryConfig = field(default_factory=TrajectoryConfig)
+    robot_type: str = field(
+        default="sim",
+        metadata={"help": "Robot type: 'sim' for simulation or 'real' for real xArm robot"},
+    )
     episodes: int = field(default=10, metadata={"help": "Number of episodes to record"})
     lin_tol_alignment: float = field(
         default=0.015, metadata={"help": "Linear tolerance for alignment servo"}
@@ -147,20 +151,20 @@ class InferConfig:
         metadata={"help": "Starting pose RPY angles"},
     )
     lin_tolerance: float = field(
-        default=5e-3, metadata={"help": "Linear tolerance for convergence (meters)"}
+        default=2e-3, metadata={"help": "Linear tolerance for convergence (meters)"}
     )
     ang_tolerance: float = field(
-        default=5, metadata={"help": "Angular tolerance for convergence (degrees)"}
+        default=4, metadata={"help": "Angular tolerance for convergence (degrees)"}
     )
     max_iterations: Optional[int] = field(
-        default=20,
+        default=5,
         metadata={"help": "Maximum iterations before stopping (None = infinite)"},
     )
     debug_output: bool = field(
         default=True, metadata={"help": "Print debug information during inference"}
     )
     debouncing_count: int = field(
-        default=20,
+        default=5,
         metadata={"help": "Number of iterations within tolerance before stopping"},
     )
     rotation_matrix_multiplier: int = field(
@@ -168,6 +172,10 @@ class InferConfig:
         metadata={
             "help": "Number of times to multiply the rotation matrix of relative action in order to speed up convergence"
         },
+    )
+    translation_multiplier: float = field(
+        default=1.0,
+        metadata={"help": "Multiplier for the translation relative action to adjust convergence speed"}
     )
     manual_height: float = field(
         default=0.08, metadata={"help": "Height above surface for manual movement"}

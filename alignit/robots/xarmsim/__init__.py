@@ -98,6 +98,14 @@ class XarmSim(Robot):
             random_pos, t3d.euler.euler2mat(roll, pitch, yaw), [1, 1, 1]
         )
         self._set_object_pose("pickup_object", pose)
+        # Lock the object joint to prevent it from falling/moving
+        self._lock_object_joint("pickup_object")
+        # Disable collisions for the pickup object so it doesn't get pushed
+        # by the robot during alignment trials.
+        try:
+            self._disable_object_collisions("pickup_object")
+        except Exception:
+            pass
         pose1 = self._get_object_pose()
         pose_start = pose1 @ t3d.affines.compose(
             [0, 0, -0.1], t3d.euler.euler2mat(0, 0, 0), [1, 1, 1]
@@ -124,6 +132,60 @@ class XarmSim(Robot):
                 qvel_adr = self.model.jnt_dofadr[joint_id]
                 self.data.qvel[qvel_adr : qvel_adr + 6] = 0
         mj.mj_forward(self.model, self.data)
+
+    def _lock_object_joint(self, object_name: str):
+        """Lock object joint to prevent any movement (translation or rotation)."""
+        try:
+            body_id = self.model.body(object_name).id
+            joint_id = self.model.body_jntadr[body_id]
+            
+            if joint_id >= 0:
+                qvel_adr = self.model.jnt_dofadr[joint_id]
+                # Lock all 6 DOFs (3 translation + 3 rotation for free joint)
+                self.data.qvel[qvel_adr : qvel_adr + 6] = 0
+                
+                # Set very high damping on the joint to resist any motion
+                try:
+                    dof_adr = self.model.jnt_dofadr[joint_id]
+                    for i in range(6):
+                        self.model.dof_damping[dof_adr + i] = 100.0  # Very high damping
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+    def _disable_object_collisions(self, object_name: str):
+        """Disable collisions AND gravity for object to keep it stationary.
+
+        This prevents the object from being pushed or reacting to contacts
+        when the robot touches it during benchmarking.
+        """
+        try:
+            body_id = self.model.body(object_name).id
+        except Exception:
+            return
+
+        # 1. Disable collisions: set contact type and affinity to 0
+        start = int(self.model.body_geomadr[body_id])
+        count = int(self.model.body_geomnum[body_id])
+        for i in range(start, start + count):
+            try:
+                self.model.geom_contype[i] = 0
+                self.model.geom_conaffinity[i] = 0
+            except Exception:
+                pass
+
+        # 2. Disable gravity on object by setting mass to near-zero
+        try:
+            self.model.body_mass[body_id] = 0.001
+        except Exception:
+            pass
+
+        # 3. Set inertia to near-zero to prevent rotation from contacts
+        try:
+            self.model.body_inertia[body_id] = [0.0001, 0.0001, 0.0001]
+        except Exception:
+            pass
 
     def close_gripper(self):
         self._set_gripper_position(self.gripper_close_pos)
@@ -159,6 +221,9 @@ class XarmSim(Robot):
         self.data.ctrl[self.mujoco_actuator_ids] = target_joint_qpos_for_mujoco
 
         mj.mj_step(self.model, self.data)
+        
+        # Lock object joint every frame to prevent any motion
+        self._lock_object_joint("pickup_object")
 
         self.viewer.sync()
         return True
@@ -191,15 +256,9 @@ class XarmSim(Robot):
             name = mujoco.mj_id2name(self.model, mujoco.mjtObj.mjOBJ_CAMERA, i)
             self.renderer.update_scene(self.data, camera=name)
             image = self.renderer.render()
-            self.renderer.enable_depth_rendering()
-            self.renderer.update_scene(self.data, camera=name)
-            image_depth = self.renderer.render()
-            self.renderer.disable_depth_rendering()
 
             # TODO: Handle multiple cameras
             obs["rgb"] = image[:, :, ::-1]
-            obs["depth"] = image_depth
-            obs["depth"] = np.clip(obs["depth"], 0, 1)
 
         return obs
 

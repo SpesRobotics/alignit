@@ -3,3 +3,4 @@
 data
 alignnet_model.pth
 
+.venv/

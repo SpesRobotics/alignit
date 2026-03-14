@@ -1,7 +1,6 @@
 import torch
 from torch.utils.data import DataLoader
 from torch.optim import Adam
-from torch.nn import MSELoss
 from tqdm import tqdm
 from datasets import load_from_disk
 from torchvision import transforms
@@ -10,15 +9,16 @@ import numpy as np
 
 from alignit.config import TrainConfig
 from alignit.models.alignnet import AlignNet
+from alignit.losses import InversePredictionWeightedLoss
+#import mse loss for comparison
+from torch.nn import MSELoss
 
 
 def collate_fn(batch):
     images = [item["images"] for item in batch]
-    depth_images = [item.get("depth", None) for item in batch]
     actions = [item["action"] for item in batch]
     return {
         "images": images,
-        "depth_images": depth_images,
         "action": torch.tensor(actions, dtype=torch.float32),
     }
 
@@ -50,14 +50,13 @@ def main(cfg: TrainConfig):
     )
 
     optimizer = Adam(net.parameters(), lr=cfg.learning_rate)
-    criterion = MSELoss()
+    criterion = InversePredictionWeightedLoss(epsilon=0.01) 
     net.train()
 
     for epoch in range(cfg.epochs):
         total_loss = 0
         for batch in tqdm(train_loader, desc=f"Epoch {epoch+1}"):
             images = batch["images"]
-            depth_images_pil = batch["depth_images"]
             actions = batch["action"].to(device)
 
             batch_rgb_tensors = []
@@ -76,32 +75,8 @@ def main(cfg: TrainConfig):
 
             batch_rgb_tensors = torch.stack(batch_rgb_tensors, dim=0).to(device)
 
-            batch_depth_tensors = None
-            if cfg.model.use_depth_input:
-                batch_depth_tensors = []
-                for depth_sequence in depth_images_pil:
-                    if depth_sequence is None:
-                        raise ValueError(
-                            "Depth images expected but not found when use_depth_input=True"
-                        )
-
-                    depth_sequence_processed = []
-                    for d_img in depth_sequence:
-                        depth_array = np.array(d_img)
-                        depth_tensor = torch.from_numpy(depth_array).float()
-                        depth_tensor = depth_tensor.unsqueeze(0)
-                        depth_sequence_processed.append(depth_tensor)
-
-                    stacked_depth = torch.stack(depth_sequence_processed, dim=0)
-                    batch_depth_tensors.append(stacked_depth)
-
-                batch_depth_tensors = torch.stack(batch_depth_tensors, dim=0).to(device)
-
             optimizer.zero_grad()
-            if cfg.model.use_depth_input:
-                outputs = net(batch_rgb_tensors, depth_images=batch_depth_tensors)
-            else:
-                outputs = net(batch_rgb_tensors)
+            outputs = net(batch_rgb_tensors)
 
             loss = criterion(outputs, actions)
             loss.backward()
