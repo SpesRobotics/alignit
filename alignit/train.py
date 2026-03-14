@@ -10,6 +10,8 @@ import numpy as np
 from alignit.config import TrainConfig
 from alignit.models.alignnet import AlignNet
 from alignit.losses import InversePredictionWeightedLoss
+#import mse loss for comparison
+from torch.nn import MSELoss
 
 
 def collate_fn(batch):
@@ -48,7 +50,7 @@ def main(cfg: TrainConfig):
     )
 
     optimizer = Adam(net.parameters(), lr=cfg.learning_rate)
-    criterion = InversePredictionWeightedLoss(epsilon=0.01)
+    criterion = InversePredictionWeightedLoss(epsilon=0.01) 
     net.train()
 
     for epoch in range(cfg.epochs):

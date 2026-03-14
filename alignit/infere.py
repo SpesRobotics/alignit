@@ -10,6 +10,7 @@ from alignit.utils.zhou import sixd_se3
 from alignit.utils.tfs import print_pose, are_tfs_close
 from alignit.robots.xarmsim import XarmSim
 
+
 Xarm = None
 try:
     from alignit.robots.xarm import Xarm
@@ -111,11 +112,9 @@ def main(cfg: InferConfig):
                     iterations_within_tolerance = 0
                     print(f"Step {iteration}: Adjusting... [error: {error_magnitude:.6f}]")
 
-                min_scale = 0.0
-                error_scale = max(error_magnitude, min_scale)
-                
                 scaled_action = relative_action.copy()
-                scaled_action[:3, 3] *= error_scale
+                translation_mult = getattr(cfg, 'translation_multiplier', 1.0)
+                scaled_action[:3, 3] *= translation_mult
                 scaled_action[:3, :3] = np.linalg.matrix_power(
                     scaled_action[:3, :3], int(cfg.rotation_matrix_multiplier)
                 )

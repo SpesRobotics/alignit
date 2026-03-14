@@ -173,6 +173,10 @@ class InferConfig:
             "help": "Number of times to multiply the rotation matrix of relative action in order to speed up convergence"
         },
     )
+    translation_multiplier: float = field(
+        default=1.0,
+        metadata={"help": "Multiplier for the translation relative action to adjust convergence speed"}
+    )
     manual_height: float = field(
         default=0.08, metadata={"help": "Height above surface for manual movement"}
     )
